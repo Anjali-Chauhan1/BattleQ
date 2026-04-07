@@ -68,6 +68,10 @@ export default function Arena() {
             setMatch(data.roomId);
             setStatus('waiting');
             addFeedback("Match Found! Connecting...");
+            // For solo mode, immediately request a dealer hint to ensure one is shown.
+            if (mode === 'solo') {
+                socket.emit('request_dealer_hint', { roomId: data.roomId });
+            }
         });
 
         socket.on('match_started', () => {
@@ -409,19 +413,27 @@ export default function Arena() {
                 )}
 
                 {/* Dealer Hint Panel (Solo mode) */}
-                {mode === 'solo' && dealerHint && (
+                {mode === 'solo' && (
                     <div className="absolute bottom-40 right-10 z-[120] max-w-xs w-full">
                         <div className="glass-panel p-5 border-primary/30 bg-primary/5 shadow-[0_0_40px_rgba(0,242,255,0.3)]">
                             <div className="flex items-center justify-between mb-3">
-                                <span className="text-[10px] uppercase font-black tracking-[0.3em] text-primary">Dealer Hint</span>
+                                <span className="text-[10px] uppercase font-black tracking-[0.3em] text-primary">Dealer</span>
                                 <Radio className="w-3 h-3 text-primary animate-pulse" />
                             </div>
-                            <p className="text-xs text-gray-300 mb-3 font-medium">
-                                {`Dealer says the winning tile is at (${dealerHint.x}, ${dealerHint.y}). You can click that tile or any other.`}
-                            </p>
-                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-1">
-                                Match the true winning tile to win, otherwise you lose.
-                            </p>
+                            {dealerHint ? (
+                                <>
+                                    <p className="text-xs text-gray-300 mb-3 font-medium">
+                                        {`Dealer says the winning tile is at (${dealerHint.x}, ${dealerHint.y}). You can click that tile or any other.`}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-1">
+                                        Match the true winning tile to win, otherwise you lose.
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-xs text-gray-400 font-medium">
+                                    Waiting for dealer hint...
+                                </p>
+                            )}
                         </div>
                     </div>
                 )}

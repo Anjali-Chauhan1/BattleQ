@@ -192,6 +192,17 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
+  // Explicit hint request from client to guarantee a dealer response in solo mode
+  socket.on('request_dealer_hint', (data: { roomId: string }) => {
+    const { roomId } = data;
+    const room = rooms[roomId];
+    if (!room) return;
+    if (room.mode !== 'solo') return;
+
+    // Always (re)start a solo round for this request
+    startSoloRound(roomId);
+  });
+
   socket.on('player_action', (data: { roomId: string; action: string; targetId?: string; x?: number; y?: number; bet?: number }) => {
     const { roomId, action, x, y, targetId, bet } = data;
     const room = rooms[roomId];
