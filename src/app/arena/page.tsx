@@ -6,16 +6,18 @@ import { useSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/useGameStore";
 import { getGuestUser } from "@/lib/user";
 import { 
-  Shield, Swords, Move, Zap, 
-  MessageSquare, Users, UserMinus, 
-  Coins, MapIcon, ChevronRight, X,
-  Target, Activity, Radio, Cpu, TrendingUp
+    Shield, Swords, Move, Zap, 
+    MessageSquare, Users, UserMinus, 
+    Coins, ChevronRight, X,
+    Target, Activity, Radio, Cpu, TrendingUp
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionButton } from "@/components/game/ActionButton";
 import { StatItem } from "@/components/ui/StatItem";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { TutorialTour } from "@/components/game/TutorialTour";
+import { useInterwovenKit } from "@initia/interwovenkit-react";
+import { useBattleQContracts } from "@/lib/contracts";
 
 
 const GRID_SIZE = 15;
@@ -32,9 +34,13 @@ export default function Arena() {
     const searchParams = useSearchParams();
     const mode = searchParams.get("mode") || "solo";
     const [alliances, setAlliances] = useState<Array<{ p1: string; p2: string }>>([]);
-    const [zones, setZones] = useState<Array<{ x: number; y: number; yield: number }>>([]);
     const [incomingAlliance, setIncomingAlliance] = useState<{ from: string; fromName: string } | null>(null);
     const [showTour, setShowTour] = useState(false);
+    const [dealerHint, setDealerHint] = useState<{ x: number; y: number } | null>(null);
+    const { address } = useInterwovenKit();
+    const { startSoloSession, claimRewards } = useBattleQContracts();
+    const [soloSessionActive, setSoloSessionActive] = useState(false);
+    const [betAmount, setBetAmount] = useState(10);
     
     // Auto-start tutorial on first load
     useEffect(() => {
@@ -72,7 +78,6 @@ export default function Arena() {
         socket.on('state_update', (data) => {
             updatePlayers(data.players);
             if (data.alliances) setAlliances(data.alliances);
-            if (data.zones) setZones(data.zones);
         });
 
         socket.on('alliance_request', (data) => {
@@ -81,6 +86,7 @@ export default function Arena() {
         });
 
         socket.on('game_event', (data) => {
+            console.log('game_event', data);
             if (data.type === 'attack') {
                 addFeedback("Attack Successful! +25");
             } else if (data.type === 'betrayal') {
@@ -93,6 +99,16 @@ export default function Arena() {
                 addFeedback("Points Shared +25");
             } else if (data.type === 'defend') {
                 addFeedback("DEFENSIVE STANCE");
+            } else if (data.type === 'dealer_result') {
+                if (data.outcome === 'move_win') {
+                    addFeedback("ROUND WON - You hit the winning tile");
+                } else if (data.outcome === 'move_loss') {
+                    addFeedback("ROUND LOST - Wrong tile");
+                } else if (data.outcome === 'ignore_true_loss') {
+                    addFeedback("ROUND LOST - You ignored a true hint");
+                } else if (data.outcome === 'ignore_false_safe') {
+                    addFeedback("SAFE - You ignored a false hint");
+                }
             }
         });
 
@@ -104,8 +120,9 @@ export default function Arena() {
             }, 3000);
         });
 
-        socket.on('zones_shifted', () => {
-             addFeedback("⚠️ CAPTURE ZONES RELOCATED");
+        socket.on('dealer_round', (payload: { hint: { x: number; y: number } }) => {
+            console.log('dealer_round', payload);
+            setDealerHint(payload.hint);
         });
 
         return () => {
@@ -113,8 +130,11 @@ export default function Arena() {
             socket.off('match_started');
             socket.off('state_update');
             socket.off('match_ended');
+            socket.off('game_event');
+            socket.off('alliance_request');
+            socket.off('dealer_round');
         };
-    }, [socket, guestUser]);
+    }, [socket, guestUser, mode]);
 
     const handleAction = (type: string, payload?: any) => {
         if (!socket || !matchId) return;
@@ -130,7 +150,7 @@ export default function Arena() {
         setFeedback(prev => [...prev, { id, text }]);
         setTimeout(() => {
             setFeedback(prev => prev.filter(f => f.id !== id));
-        }, 2000);
+        }, 5000);
     };
 
     const me = players[socket?.id || ""];
@@ -175,6 +195,21 @@ export default function Arena() {
                             </div>
                             <span className={`text-2xl font-black italic tracking-tighter uppercase ${mode === 'stakes' ? 'neon-text-pink' : 'text-primary'}`}>{mode}</span>
                         </div>
+                        {address && (
+                            <div className="h-12 w-[1px] bg-white/10 hidden lg:block" />
+                        )}
+
+                        {address && (
+                            <div className="flex flex-col gap-1 hidden lg:flex">
+                                <div className="flex items-center gap-3">
+                                    <Cpu className="w-3 h-3 text-primary" />
+                                    <span className="text-[10px] text-gray-500 uppercase font-black tracking-[0.4em]">Initia ID</span>
+                                </div>
+                                <span className="text-xs font-black italic tracking-tight text-white">
+                                    {`${address.slice(0, 6)}…${address.slice(-4)}.init`}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-10" id="stats-info">
@@ -190,7 +225,9 @@ export default function Arena() {
 
                         <div className="flex items-center gap-8 translate-y-1">
                             <StatItem icon={<Shield className="w-6 h-6 text-primary"/>} value={`${me?.hp || 100}`} label="Armor" />
-                            <StatItem icon={<Coins className="w-6 h-6 text-secondary"/>} value={me?.reputation || 0} label="Trust" />
+                            {mode !== 'solo' && (
+                                <StatItem icon={<Coins className="w-6 h-6 text-secondary"/>} value={me?.reputation || 0} label="Trust" />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -229,11 +266,11 @@ export default function Arena() {
                         const allPlayersHere = Object.values(players).filter(p => p.x === x && p.y === y);
                         const isPlayerHere = allPlayersHere[0];
                         const isMe = allPlayersHere.find(p => p.id === socket?.id);
-                        const hasZoneHere = zones.some(z => z.x === x && z.y === y);
+                        const hasZoneHere = false;
 
-                        
                         const distance = me ? Math.max(Math.abs(x - me.x), Math.abs(y - me.y)) : 0;
-                        const isVisible = me ? distance <= VIEW_RADIUS : true;
+                        // In solo mode we expose the full grid so every tile is clickable.
+                        const isVisible = mode === 'solo' ? true : (me ? distance <= VIEW_RADIUS : true);
                         
                         // Check if player here is an ally
                         const isAlly = isPlayerHere && socket?.id && alliances.some(a => 
@@ -241,25 +278,25 @@ export default function Arena() {
                             (a.p2 === socket.id && a.p1 === isPlayerHere.id)
                         );
                         
+                        const movePayload = mode === 'solo' ? { x, y, bet: betAmount } : { x, y };
+
                         return (
                             <div 
                                 key={i}
-                                onClick={() => handleAction('move', { x, y })}
+                                onClick={() => handleAction('move', movePayload)}
                                 className={`
                                     relative border border-white/[0.03] rounded-[1px] transition-all cursor-pointer hover:bg-primary/10 overflow-hidden
                                     ${isPlayerHere && isVisible ? 'bg-white/[0.02]' : ''}
                                     ${hasZoneHere && isVisible ? 'bg-yellow-500/[0.03]' : ''}
-                                    ${!isVisible ? 'bg-[#030303] opacity-20 pointer-events-none' : ''}
+                                    ${mode === 'solo' && dealerHint && dealerHint.x === x && dealerHint.y === y ? 'border-primary/80 bg-primary/10' : ''}
+                                    ${!isVisible ? 'bg-[#030303] opacity-20' : ''}
                                 `}
                             >
+                                {/* Coordinate label for easier navigation */}
+                                <div className="absolute top-[1px] left-[2px] text-[6px] text-gray-600 opacity-50 pointer-events-none font-mono">
+                                    {x},{y}
+                                </div>
                                 <AnimatePresence>
-                                    {hasZoneHere && isVisible && (
-                                        <motion.div 
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="absolute inset-0 bg-yellow-400/[0.05] shadow-[inset_0_0_10px_rgba(255,200,0,0.1)] blur-[1px]"
-                                        />
-                                    )}
                                     {isPlayerHere && isVisible && (
                                         <motion.div
                                             initial={{ scale: 0, rotate: -45 }}
@@ -370,13 +407,105 @@ export default function Arena() {
                         onComplete={completeTour} 
                     />
                 )}
+
+                {/* Dealer Hint Panel (Solo mode) */}
+                {mode === 'solo' && dealerHint && (
+                    <div className="absolute bottom-40 right-10 z-[120] max-w-xs w-full">
+                        <div className="glass-panel p-5 border-primary/30 bg-primary/5 shadow-[0_0_40px_rgba(0,242,255,0.3)]">
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-[10px] uppercase font-black tracking-[0.3em] text-primary">Dealer Hint</span>
+                                <Radio className="w-3 h-3 text-primary animate-pulse" />
+                            </div>
+                            <p className="text-xs text-gray-300 mb-3 font-medium">
+                                {`Dealer says the winning tile is at (${dealerHint.x}, ${dealerHint.y}). You can click that tile or any other.`}
+                            </p>
+                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] mt-1">
+                                Match the true winning tile to win, otherwise you lose.
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Tactical Interaction Panel */}
-            <div className="h-32 bg-black/90 backdrop-blur-3xl border-t border-white/5 z-50 overflow-hidden">
-                <div className="max-w-7xl mx-auto h-full px-8 flex items-center justify-between">
-                    <div className="flex gap-4 md:gap-6">
-                    <ActionButton 
+                        <div className="h-32 bg-black/90 backdrop-blur-3xl border-t border-white/5 z-50 overflow-hidden">
+                                <div className="max-w-7xl mx-auto h-full px-8 flex items-center justify-between">
+                                        {mode === 'solo' ? (
+                                            <div className="flex items-center justify-between w-full gap-8">
+                                                <div className="flex flex-col justify-center gap-2 max-w-xl">
+                                                    <span className="text-[10px] text-gray-500 font-black uppercase tracking-[0.35em]">Solo Prediction Mode</span>
+                                                    <p className="text-xs text-gray-300">
+                                                        Dealer highlights one tile as the winning block. Click any visible tile to take the bet: right tile = win, wrong tile = loss. Or press Ignore to skip this hint.
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500 mt-1">
+                                                        Ignore a true hint: loss. Ignore a false hint: safe, no win/no loss, next hint.
+                                                    </p>
+                                                    {address && (
+                                                        <p className="text-[10px] text-primary mt-1 font-black uppercase tracking-[0.25em]">
+                                                            {soloSessionActive
+                                                                ? "Initia Stakes Session Active via InterwovenKit"
+                                                                : "Start an Initia stakes session to anchor your rounds on-chain."
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex gap-4 items-center">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!dealerHint || !matchId || !socket) return;
+                                                            handleAction('move', { x: dealerHint.x, y: dealerHint.y, bet: betAmount });
+                                                        }}
+                                                        className="px-6 py-3 bg-primary text-black font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-white transition-all"
+                                                    >
+                                                        Trust Hint
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (!matchId || !socket) return;
+                                                            handleAction('ignore_hint', { bet: betAmount });
+                                                        }}
+                                                        className="px-6 py-3 bg-white/5 text-white font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-white/10 border border-white/10 transition-all"
+                                                    >
+                                                        Ignore
+                                                    </button>
+                                                    {address && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!startSoloSession) return;
+                                                                try {
+                                                                    // Example fixed stake amount; replace with UI-configurable if needed
+                                                                    await startSoloSession("1000000");
+                                                                    setSoloSessionActive(true);
+                                                                } catch (e) {
+                                                                    console.error(e);
+                                                                }
+                                                            }}
+                                                            className="px-6 py-3 bg-secondary text-white font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-secondary/80 transition-all hidden md:inline-flex"
+                                                        >
+                                                            {soloSessionActive ? "Session Funded" : "Start Stakes Session"}
+                                                        </button>
+                                                    )}
+                                                    {address && soloSessionActive && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!claimRewards) return;
+                                                                try {
+                                                                    await claimRewards();
+                                                                    setSoloSessionActive(false);
+                                                                } catch (e) {
+                                                                    console.error(e);
+                                                                }
+                                                            }}
+                                                            className="px-6 py-3 bg-primary text-black font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-white transition-all hidden md:inline-flex"
+                                                        >
+                                                            Withdraw / Settle
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                        <div className="flex gap-4 md:gap-6">
+                                        <ActionButton 
                         id="btn-strike"
                         icon={<Swords className="w-5 h-5" />} 
                         label="Engage Strike" 
@@ -431,7 +560,9 @@ export default function Arena() {
                         }} 
                     />
                     </div>
+                    )}
 
+                    {mode !== 'solo' && (
                     <div className="flex items-center gap-10 glass-panel p-4 px-10 border-white/5 bg-white/[0.02]">
                         <div className="flex flex-col gap-1 hidden sm:flex">
                             <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Strategy Impact</span>
@@ -485,6 +616,7 @@ export default function Arena() {
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
             </div>
         </main>
