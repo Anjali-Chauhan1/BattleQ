@@ -4,7 +4,9 @@ import { StdFee } from "@cosmjs/stargate";
 export const useBattleQContracts = () => {
     const { requestTxSync, address } = useInterwovenKit();
 
-    const stakeTokens = async (amount: string) => {
+    // Simple "session" starter: user stakes an amount into the BattleQ escrow module
+    // and we treat that as the start of a solo stakes session.
+    const startSoloSession = async (amount: string) => {
         if (!address) return;
 
         // Placeholder for Initia move message
@@ -30,10 +32,10 @@ export const useBattleQContracts = () => {
                 messages: [message],
                 gas: 200000,
             });
-            console.log("Staking TX Hash:", txHash);
+            console.log("BattleQ solo session started, staking TX Hash:", txHash);
             return txHash;
         } catch (error) {
-            console.error("Staking failed:", error);
+            console.error("Solo session start failed:", error);
             throw error;
         }
     };
@@ -67,7 +69,7 @@ export const useBattleQContracts = () => {
     };
 
     return {
-        stakeTokens,
+        startSoloSession,
         claimRewards,
     };
 };
