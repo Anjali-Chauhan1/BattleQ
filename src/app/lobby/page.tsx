@@ -6,6 +6,7 @@ import { Users, User, Rocket, Shield, TrendingUp, Wallet, ChevronRight, LayoutGr
 import { getGuestUser } from "@/lib/user";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { RoomCard } from "@/components/lobby/RoomCard";
+import { WalletConnectButton } from "@/components/ui/WalletConnectButton";
 import { useState, useEffect } from "react";
 
 export default function Lobby() {
@@ -72,6 +73,8 @@ export default function Lobby() {
 
                             <div className="h-10 w-[1px] bg-white/10" />
 
+                            <WalletConnectButton />
+
                             <motion.button
                                 whileHover={{ scale: 1.05, y: -2 }}
                                 whileTap={{ scale: 0.95 }}
@@ -123,7 +126,7 @@ export default function Lobby() {
                         variants={containerVariants}
                         initial="hidden"
                         animate="visible"
-                        className="grid grid-cols-1 md:grid-cols-3 gap-10"
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"
                     >
                         <motion.div variants={itemVariants}>
                             <RoomCard
@@ -131,31 +134,9 @@ export default function Lobby() {
                                 icon={<User className="w-10 h-10" />}
                                 entryFee={5}
                                 avgReward={12}
-                                stats="Pure tactical dominance. Every operative for themselves."
+                                stats="Prediction arena against the Initia dealer."
                                 variant="blue"
                                 onClick={() => router.push("/arena?mode=solo")}
-                            />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                            <RoomCard
-                                title="Pact"
-                                icon={<Users className="w-10 h-10" />}
-                                entryFee={10}
-                                avgReward={28}
-                                stats="Collaborative mechanics. Share vision and double rewards."
-                                variant="purple"
-                                onClick={() => router.push("/arena?mode=alliance")}
-                            />
-                        </motion.div>
-                        <motion.div variants={itemVariants}>
-                            <RoomCard
-                                title="Elite"
-                                icon={<Rocket className="w-10 h-10" />}
-                                entryFee={50}
-                                avgReward={145}
-                                stats="Unpredictable AI. Maximum betrayal stakes. High-Octane Earn."
-                                variant="pink"
-                                onClick={() => router.push("/arena?mode=stakes")}
                             />
                         </motion.div>
                     </motion.div>

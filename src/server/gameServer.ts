@@ -40,6 +40,13 @@ const rooms: Record<string, {
   mode: string;
   alliances: Array<{ p1: string; p2: string }>;
   zones: Array<{ x: number; y: number; yield: number }>;
+  soloRound?: {
+    winX: number;
+    winY: number;
+    hintX: number;
+    hintY: number;
+    hintTruth: boolean;
+  };
 }> = {};
 
 // --- AI ENGINE ---
@@ -105,6 +112,34 @@ function applyBehavioralShaping(roomId: string) {
     });
 }
 
+// --- Solo Round Logic (dealer chooses winning tile and hint) ---
+function startSoloRound(roomId: string) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const gridLimit = 15;
+  const winX = Math.floor(Math.random() * gridLimit);
+  const winY = Math.floor(Math.random() * gridLimit);
+
+  const hintTruth = Math.random() > 0.5;
+  let hintX = winX;
+  let hintY = winY;
+
+  if (!hintTruth) {
+    // pick a different random tile
+    do {
+      hintX = Math.floor(Math.random() * gridLimit);
+      hintY = Math.floor(Math.random() * gridLimit);
+    } while (hintX === winX && hintY === winY);
+  }
+
+  room.soloRound = { winX, winY, hintX, hintY, hintTruth };
+
+  io.to(roomId).emit('dealer_round', {
+    hint: { x: hintX, y: hintY },
+  });
+}
+
 io.on('connection', (socket: Socket) => {
   console.log('User connected:', socket.id);
 
@@ -125,7 +160,7 @@ io.on('connection', (socket: Socket) => {
         difficulty: (data.level || 1) > 10 ? 2 : 1,
         mode: gameMode,
         alliances: [],
-        zones: Array.from({ length: 5 }).map(() => ({ x: Math.floor(Math.random() * 15), y: Math.floor(Math.random() * 15), yield: 50 }))
+        zones: []
       };
     }
 
@@ -150,17 +185,60 @@ io.on('connection', (socket: Socket) => {
     
     io.to(roomId).emit('player_joined', { players: rooms[roomId].players, roomId });
 
-    if (Object.keys(rooms[roomId].players).length >= 2) {
+    if (rooms[roomId].mode === 'solo') {
+      startMatch(roomId);
+    } else if (Object.keys(rooms[roomId].players).length >= 2) {
       startMatch(roomId);
     }
   });
 
-  socket.on('player_action', (data: { roomId: string; action: string; targetId?: string; x?: number; y?: number }) => {
-    const { roomId, action, x, y, targetId } = data;
+  socket.on('player_action', (data: { roomId: string; action: string; targetId?: string; x?: number; y?: number; bet?: number }) => {
+    const { roomId, action, x, y, targetId, bet } = data;
     const room = rooms[roomId];
     if (!room || !room.players[socket.id]) return;
 
     const player = room.players[socket.id];
+
+    // Solo game rules
+    if (room.mode === 'solo' && room.soloRound) {
+      const round = room.soloRound;
+      const wager = bet ?? 10;
+
+      if (action === 'move' && x !== undefined && y !== undefined) {
+        const isWinTile = x === round.winX && y === round.winY;
+        const clickedHint = x === round.hintX && y === round.hintY;
+
+        let outcome: 'move_win' | 'move_loss';
+        if (isWinTile) {
+          outcome = 'move_win';
+          player.score += wager;
+        } else {
+          outcome = 'move_loss';
+          player.score -= wager;
+        }
+
+        io.to(roomId).emit('game_event', { 
+          type: 'dealer_result', 
+          outcome, 
+          playerId: player.id, 
+          clickedHint 
+        });
+
+        // Start next hint round
+        startSoloRound(roomId);
+      } else if (action === 'ignore_hint') {
+        if (round.hintTruth) {
+          // Ignored a true hint -> loss at current wager
+          player.score -= wager;
+          io.to(roomId).emit('game_event', { type: 'dealer_result', outcome: 'ignore_true_loss', playerId: player.id });
+        } else {
+          // Ignored a false hint -> neutral safe outcome
+          io.to(roomId).emit('game_event', { type: 'dealer_result', outcome: 'ignore_false_safe', playerId: player.id });
+        }
+
+        startSoloRound(roomId);
+      }
+    }
     
     if (action === 'move' && x !== undefined && y !== undefined) {
       player.x = x;
@@ -226,7 +304,7 @@ io.on('connection', (socket: Socket) => {
         io.to(roomId).emit('game_event', { type: 'defend', from: player.id });
     }
 
-    io.to(roomId).emit('state_update', { players: room.players, alliances: room.alliances, zones: room.zones });
+    io.to(roomId).emit('state_update', { players: room.players, alliances: room.alliances });
   });
 
   socket.on('disconnect', () => {
@@ -246,7 +324,13 @@ function startMatch(roomId: string) {
   room.status = 'playing';
   io.to(roomId).emit('match_started', { startTime: Date.now() });
 
-  // Matchmaking: Configure Bots based on Room Mode
+  // Solo mode: simple dealer/round system, no bots or timers
+  if (room.mode === 'solo') {
+    startSoloRound(roomId);
+    return;
+  }
+
+  // Other modes: original bot-based arena with ticking timer
   const playerCount = Object.keys(room.players).length;
   let targetBots = room.difficulty === 1 ? 4 : 6;
   
@@ -285,32 +369,7 @@ function startMatch(roomId: string) {
     processAITurn(roomId);
     applyBehavioralShaping(roomId);
 
-    // Dynamic Zone Migration (Relocate zones every 30s)
-    if (room.time % 30 === 0) {
-        room.zones = Array.from({ length: 5 }).map(() => ({ 
-            x: Math.floor(Math.random() * 20), 
-            y: Math.floor(Math.random() * 20), 
-            yield: 50 
-        }));
-        io.to(roomId).emit('game_event', { type: 'zones_shifted' });
-    }
-
-    // Resource accumulation logic
-    room.zones.forEach(z => {
-        const occupiers = Object.values(room.players).filter(p => p.x === z.x && p.y === z.y);
-        occupiers.forEach(p => {
-            p.score += 5; // Passive yield
-            const allianceOccupiers = occupiers.filter(other => 
-                other.id !== p.id && room.alliances.some(a => (a.p1 === p.id && a.p2 === other.id) || (a.p1 === other.id && a.p2 === p.id))
-            );
-            if (allianceOccupiers.length > 0) {
-                p.score += 10; // Alliance bonus
-                p.reputation += 0.5;
-            }
-        });
-    });
-
-    io.to(roomId).emit('tick', { time: room.time, players: room.players, zones: room.zones, alliances: room.alliances });
+    io.to(roomId).emit('tick', { time: room.time, players: room.players, alliances: room.alliances });
 
     if (room.time <= 0) {
       clearInterval(interval);
