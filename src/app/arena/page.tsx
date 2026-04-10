@@ -33,7 +33,8 @@ export default function Arena() {
     // If we are in selecting OR staking mode, use the full-screen layout
     if (solo.gameStatus === 'selecting' || solo.gameStatus === 'staking') {
         const isElite = solo.level > 3;
-        const currentStake = isElite ? solo.stake : (solo.level * 10);
+        const practiceStakes = [5, 10, 15];
+        const currentStake = isElite ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
         
         // Multiplier calculation mirrored from useGameStore.ts
         // In Elite Arena, we show the base multiplier (1.5x) or a dynamic range

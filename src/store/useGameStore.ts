@@ -120,16 +120,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     
     const totalItems = numFakes + 1; // Fakes + 1 Real Treasure
     
-    // Moves available: Proportional scaling (Ratio ~0.625 based on 10/16)
-    // Providing ~10 chances for 15-16 boxes, scaling dynamically for other totals.
-    const targetRatio = 10 / 16;
-    let moves = isFixedGrid 
-      ? Math.ceil(totalItems * targetRatio)
-      : Math.ceil(totalItems * 0.35) + 1;
+    // Moves available: Fixed to 5 chances for all levels after the 3 beginner levels
+    // For Practice levels (1-3), it scales naturally with the smaller grid
+    let moves = isFixedGrid ? 5 : Math.ceil(totalItems * 0.35) + 1;
     
-    // Add small random variance (+/- 1) to make games feel unique
-    const randomVariance = isFixedGrid ? (Math.floor(Math.random() * 3) - 1) : (Math.floor(Math.random() * 3) - 1); 
-    moves = Math.max(isFixedGrid ? 6 : 2, moves + randomVariance);
+    if (!isFixedGrid) {
+      const randomVariance = Math.floor(Math.random() * 3) - 1; 
+      moves = Math.max(2, moves + randomVariance);
+    }
 
     // Final Guard: Chances must be less than or equal to the number of scan targets (totalItems)
     moves = Math.min(moves, totalItems);
@@ -188,7 +186,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     if (x === solo.treasurePos?.x && y === solo.treasurePos?.y) {
       const isFixedGrid = solo.level > 3;
-      const stakeAmount = isFixedGrid ? solo.stake : (solo.level * 10);
+      const practiceStakes = [5, 10, 15];
+      const stakeAmount = isFixedGrid ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
       
       // Dynamic scaling: Reward = Stake * Multiplier
       const multiplier = isFixedGrid ? (1.5 + (newRevealed.size * 0.1)) : (1.5 + (solo.level * 0.2));
@@ -219,7 +218,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         };
       });
     } else if (nextMoves <= 0) {
-      const stakeAmount = solo.level > 3 ? solo.stake : (solo.level * 10);
+      const practiceStakes = [5, 10, 15];
+      const stakeAmount = solo.level > 3 ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
       set((state) => ({
         solo: {
           ...state.solo,

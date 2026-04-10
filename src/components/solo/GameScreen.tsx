@@ -12,7 +12,8 @@ export const GameScreen = () => {
     const { solo, clickTile, setSoloStatus, startLevel, nextLevel } = useGameStore();
     
     const isElite = solo.level > 3;
-    const currentStake = isElite ? solo.stake : (solo.level * 10);
+    const practiceStakes = [5, 10, 15];
+    const currentStake = isElite ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
 
     // Win Overlay Component
     const WinOverlay = () => (
