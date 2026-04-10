@@ -7,8 +7,6 @@ import { useGameStore } from "@/store/useGameStore";
 import { getGuestUser } from "@/lib/user";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { TutorialTour } from "@/components/game/TutorialTour";
-import { useInterwovenKit } from "@initia/interwovenkit-react";
-import { useBattleQContracts } from "@/lib/contracts";
 
 // Solo System Imports
 import { LevelSelectionScreen } from "@/components/solo/LevelSelectionScreen";
@@ -63,7 +61,7 @@ export default function Arena() {
                                 <StakeConfirmation 
                                     level={solo.level}
                                     stakeAmount={solo.level * 10}
-                                    potentialReward={ (solo.level * 10) + (solo.level * 5) + 5 }
+                                    potentialReward={ (solo.level * 10) + (solo.level * 5) - 3 }
                                     onConfirm={() => setSoloStatus('playing')}
                                     onCancel={() => setSoloStatus('selecting')}
                                 />

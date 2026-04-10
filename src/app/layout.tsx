@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
-import { InitiaProvider } from "@/components/providers/InitiaProvider";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -26,9 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${outfit.variable} ${inter.variable}`} suppressHydrationWarning>
       <body className="bg-background text-foreground font-sans min-h-screen">
-        <InitiaProvider>
           {children}
-        </InitiaProvider>
       </body>
     </html>
   );

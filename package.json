@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:next\" \"npm run dev:server\"",
-    "dev:next": "next dev -p 3005",
+    "dev:next": "next dev -p 3000",
     "dev:server": "tsx src/server/gameServer.ts",
     "build": "next build",
-    "start": "next start -p 3005",
+    "start": "next start -p 3000",
     "start:all": "concurrently \"npm run start\" \"npm run dev:server\"",
     "lint": "next lint"
   },

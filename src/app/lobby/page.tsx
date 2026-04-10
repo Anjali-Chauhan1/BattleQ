@@ -6,7 +6,6 @@ import { Users, User, Rocket, Shield, TrendingUp, Wallet, ChevronRight, LayoutGr
 import { getGuestUser } from "@/lib/user";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { RoomCard } from "@/components/lobby/RoomCard";
-import { WalletConnectButton } from "@/components/ui/WalletConnectButton";
 import { useState, useEffect } from "react";
 
 export default function Lobby() {
@@ -75,8 +74,6 @@ export default function Lobby() {
                             </div>
 
                             <div className="h-10 w-[1px] bg-primary/20" />
-
-                            <WalletConnectButton />
 
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
