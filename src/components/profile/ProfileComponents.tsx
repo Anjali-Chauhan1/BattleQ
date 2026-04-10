@@ -18,11 +18,12 @@ export function HistoryRow({ result, reward, mode, date, color }: any) {
     )
 }
 
-export function DashboardStat({ label, value }: any) {
+export function DashboardStat({ label, value, subValue }: any) {
     return (
         <div className="flex flex-col">
             <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest mb-1">{label}</span>
-            <span className="text-sm font-bold text-white">{value}</span>
+            <span className="text-sm font-bold text-white uppercase">{value}</span>
+            {subValue && <span className="text-[7px] text-primary font-black mt-1 uppercase opacity-70 tracking-widest">{subValue}</span>}
         </div>
     )
 }

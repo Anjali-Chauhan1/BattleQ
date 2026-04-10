@@ -15,7 +15,7 @@ import { GameScreen } from "@/components/solo/GameScreen";
 import { StakeConfirmation } from "@/components/solo/StakeConfirmation";
 
 export default function Arena() {
-    const { solo, setSoloStatus, startLevel } = useGameStore();
+    const { solo, setSoloStatus, startLevel, setStake } = useGameStore();
     const [showTour, setShowTour] = useState(false);
     
     useEffect(() => {
@@ -32,6 +32,14 @@ export default function Arena() {
 
     // If we are in selecting OR staking mode, use the full-screen layout
     if (solo.gameStatus === 'selecting' || solo.gameStatus === 'staking') {
+        const isElite = solo.level > 3;
+        const currentStake = isElite ? solo.stake : (solo.level * 10);
+        
+        // Multiplier calculation mirrored from useGameStore.ts
+        // In Elite Arena, we show the base multiplier (1.5x) or a dynamic range
+        const multiplier = isElite ? 1.5 : (1.5 + (solo.level * 0.2));
+        const potentialReward = Math.floor(currentStake * multiplier);
+
         return (
             <AuthGuard>
                 <main className="min-h-screen bg-[#020203] font-mono text-white cyber-grid relative overflow-y-auto">
@@ -60,10 +68,11 @@ export default function Arena() {
                             >
                                 <StakeConfirmation 
                                     level={solo.level}
-                                    stakeAmount={solo.level * 10}
-                                    potentialReward={ (solo.level * 10) + (solo.level * 5) - 3 }
+                                    stakeAmount={currentStake}
+                                    potentialReward={potentialReward}
                                     onConfirm={() => setSoloStatus('playing')}
                                     onCancel={() => setSoloStatus('selecting')}
+                                    onStakeChange={isElite ? setStake : undefined}
                                 />
                             </motion.div>
                         )}

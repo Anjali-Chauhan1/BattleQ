@@ -146,8 +146,12 @@ export default function Profile() {
                         </h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 relative z-10">
                           <DashboardStat label="Total Credits" value={`${solo.score} BQT`} />
-                          <DashboardStat label="Current Tier" value={solo.unlockedLevel > 5 ? "Veteran" : "Initiate"} />
-                          <DashboardStat label="Active Missions" value={solo.history.length} />
+                          <DashboardStat label="Current Tier" value={solo.level > 3 ? "Elite Operative" : "Sector Scout"} />
+                          <DashboardStat 
+                            label="Withdrawal" 
+                            value={solo.withdrawalUnlocked ? "UNLOCKED" : "LOCKED"} 
+                            subValue={solo.withdrawalUnlocked ? "PERMANENT ACCESS" : "REQUIRED: PASS LVL 3"}
+                          />
                           <DashboardStat label="Status" value="SYNCED" />
                         </div>
                     </motion.div>

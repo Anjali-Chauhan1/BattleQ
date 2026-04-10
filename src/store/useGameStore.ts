@@ -36,6 +36,8 @@ export interface SoloGameState {
   gameStatus: 'selecting' | 'rules' | 'staking' | 'playing' | 'won' | 'lost';
   score: number;
   history: SoloHistory[];
+  withdrawalUnlocked: boolean;
+  stake: number;
 }
 
 interface GameState {
@@ -49,6 +51,7 @@ interface GameState {
   updatePlayers: (players: Record<string, Player>) => void;
   setStatus: (status: GameState['status']) => void;
   setTutorial: (show: boolean) => void;
+  setStake: (amount: number) => void;
   startLevel: (level: number) => void;
   setSoloStatus: (status: SoloGameState['gameStatus']) => void;
   clickTile: (x: number, y: number) => void;
@@ -76,6 +79,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     gameStatus: 'selecting',
     score: 0,
     history: [],
+    withdrawalUnlocked: false,
+    stake: 50,
   },
 
   setMatch: (id) => set({ matchId: id }),
@@ -83,41 +88,51 @@ export const useGameStore = create<GameState>((set, get) => ({
   setStatus: (status) => set({ status }),
   setTutorial: (show) => set({ showTutorial: show }),
 
+  setStake: (amount) => set((state) => ({
+    solo: { ...state.solo, stake: amount }
+  })),
+
   setSoloStatus: (status) => set((state) => ({ 
     solo: { ...state.solo, gameStatus: status } 
   })),
 
   startLevel: (level) => {
+    const { solo } = get();
+    // Guard against playing levels not yet unlocked
+    if (level > solo.unlockedLevel) return;
+
     // Show staking screen first
     set((state) => ({ 
       solo: { ...state.solo, level, gameStatus: 'staking' } 
     }));
 
-    // Difficulty Factors:
-    // Scale Grid Size: Start at 3x3 for level 1, grow steadily.
-    const gridSize = Math.min(3 + Math.floor(level / 2), 10);
+    const isFixedGrid = level > 3;
+    const gridSize = isFixedGrid ? 6 : Math.min(3 + Math.floor(level / 2), 10);
     
-    // Scale Fakes: Start with few at level 1, increase as level goes up.
-    // Level 1: ~1-2, Level 5: ~4-5, Level 10: ~8-9.
-    const numFakes = Math.min(Math.floor(Math.random() * 2) + 1 + Math.floor(level / 2), 12);
+    // Randomize probabilities: After level 3, we have more fakes and traps
+    const numFakes = isFixedGrid
+      ? Math.floor(Math.random() * 4) + 12 // Reduced density: 12-15 fakes for 6x6
+      : Math.min(Math.floor(Math.random() * 2) + 1 + Math.floor(level / 2), 12);
     
-    // Scale Traps: Now start at Level 2 as requested.
-    // Level 1: 0, Level 2: 1-2, Level 5: 3-4, Level 10: 6-7.
-    const numTraps = level >= 2 ? Math.min(Math.floor(Math.random() * 2) + level - 1, 8) : 0;
+    const numTraps = isFixedGrid
+      ? Math.floor(Math.random() * 3) + 7 // Increased danger: 7-9 traps for 6x6
+      : (level >= 2 ? Math.min(Math.floor(Math.random() * 2) + level - 1, 8) : 0);
     
-    // Calculate Moves (The "Chance"):
-    // Higher "Chance" (ratio) for lower levels, tighter for higher levels.
-    // Level 1: Ratio 0.75 (3 moves for 4 potential spots).
-    // Level 5: Ratio 0.40 (Tighter).
-    // Level 10: Ratio 0.25 (Very tight).
-    const totalPotential = numFakes + 1;
+    const totalItems = numFakes + 1; // Fakes + 1 Real Treasure
     
-    // Add randomness to the move ratio so it's not a direct linear scale
-    const baseRatio = Math.max(0.15, 0.85 - (level * 0.07));
-    const randomVariance = (Math.random() * 0.2) - 0.1; // +/- 10% randomness
-    const moveRatio = baseRatio + randomVariance;
+    // Moves available: Proportional scaling (Ratio ~0.625 based on 10/16)
+    // Providing ~10 chances for 15-16 boxes, scaling dynamically for other totals.
+    const targetRatio = 10 / 16;
+    let moves = isFixedGrid 
+      ? Math.ceil(totalItems * targetRatio)
+      : Math.ceil(totalItems * 0.35) + 1;
     
-    const moves = Math.max(1, Math.min(Math.ceil(totalPotential * moveRatio) + (level < 2 ? 1 : 0), 8));
+    // Add small random variance (+/- 1) to make games feel unique
+    const randomVariance = isFixedGrid ? (Math.floor(Math.random() * 3) - 1) : (Math.floor(Math.random() * 3) - 1); 
+    moves = Math.max(isFixedGrid ? 6 : 2, moves + randomVariance);
+
+    // Final Guard: Chances must be less than or equal to the number of scan targets (totalItems)
+    moves = Math.min(moves, totalItems);
 
     const tx = Math.floor(Math.random() * gridSize);
     const ty = Math.floor(Math.random() * gridSize);
@@ -171,43 +186,51 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const nextMoves = Math.max(0, solo.movesLeft - movesUsed);
 
-    if (isTreasure) {
-    
-      const stakeAmount = solo.level * 10;
-      const winAmount = stakeAmount + (solo.level * 5) - 3;
+    if (x === solo.treasurePos?.x && y === solo.treasurePos?.y) {
+      const isFixedGrid = solo.level > 3;
+      const stakeAmount = isFixedGrid ? solo.stake : (solo.level * 10);
       
-      set((state) => ({
-        solo: {
-          ...state.solo,
-          revealedTiles: newRevealed,
-          gameStatus: 'won',
-          score: state.solo.score + winAmount,
-          unlockedLevel: Math.max(state.solo.unlockedLevel, solo.level + 1),
-          history: [
-            {
-              result: 'SUCCESS' as const,
-              reward: `+${winAmount}`,
-              level: solo.level,
-              date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-            },
-            ...state.solo.history
-          ].slice(0, 5)
-        }
-      }));
+      // Dynamic scaling: Reward = Stake * Multiplier
+      const multiplier = isFixedGrid ? (1.5 + (newRevealed.size * 0.1)) : (1.5 + (solo.level * 0.2));
+      const winAmount = Math.floor(stakeAmount * multiplier);
+      
+      set((state) => {
+        const nextUnlockedLevel = Math.max(state.solo.unlockedLevel, solo.level + 1);
+        const withdrawalUnlocked = state.solo.withdrawalUnlocked || nextUnlockedLevel > 3;
+        
+        return {
+          solo: {
+            ...state.solo,
+            revealedTiles: newRevealed,
+            gameStatus: 'won',
+            score: state.solo.score + winAmount,
+            unlockedLevel: nextUnlockedLevel,
+            withdrawalUnlocked: withdrawalUnlocked,
+            history: [
+              {
+                result: 'SUCCESS' as const,
+                reward: `+${winAmount}`,
+                level: solo.level,
+                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+              },
+              ...state.solo.history
+            ].slice(0, 5)
+          }
+        };
+      });
     } else if (nextMoves <= 0) {
-      const lossAmount = solo.level * 10;
+      const stakeAmount = solo.level > 3 ? solo.stake : (solo.level * 10);
       set((state) => ({
         solo: {
           ...state.solo,
           revealedTiles: newRevealed,
           movesLeft: 0,
           gameStatus: 'lost',
-          // Deduct the stake (10 per level) on loss
-          score: Math.max(0, state.solo.score - lossAmount),
+          score: Math.max(0, state.solo.score - stakeAmount),
           history: [
             {
               result: 'FAILED' as const,
-              reward: `-${lossAmount}`,
+              reward: `-${stakeAmount}`,
               level: solo.level,
               date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             },
@@ -232,12 +255,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       level: 1,
       unlockedLevel: 1,
       score: 0,
-      gameStatus: 'selecting'
+      gameStatus: 'selecting',
+      withdrawalUnlocked: false,
+      stake: 50,
     }
   })),
 
   nextLevel: () => {
     const { solo } = get();
-    get().startLevel(solo.level + 1);
+    const nextLevel = solo.level >= 3 ? 4 : solo.level + 1;
+    get().startLevel(nextLevel);
   }
 }));

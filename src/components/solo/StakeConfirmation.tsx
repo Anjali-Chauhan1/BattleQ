@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Shield, Lock, Zap, Trophy, ChevronRight } from 'lucide-react';
+import { Target, Shield, Lock, Zap, Trophy, ChevronRight, Plus, Minus } from 'lucide-react';
 import React from 'react';
 
 interface StakeConfirmationProps {
@@ -10,6 +10,7 @@ interface StakeConfirmationProps {
     potentialReward: number;
     onConfirm: () => void;
     onCancel: () => void;
+    onStakeChange?: (amount: number) => void;
 }
 
 export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({ 
@@ -17,8 +18,11 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
     stakeAmount, 
     potentialReward, 
     onConfirm, 
-    onCancel 
+    onCancel,
+    onStakeChange
 }) => {
+    const isElite = level > 3;
+
     return (
         <motion.div 
             initial={{ opacity: 0 }} 
@@ -64,12 +68,12 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                     </div>
                     <div>
                         <h2 className="text-3xl font-black text-white tracking-tighter uppercase leading-none italic">
-                            MISSION_SYNC_REQUIRED
+                            {isElite ? 'ELITE_ARENA_SYNC' : 'MISSION_SYNC_REQUIRED'}
                         </h2>
                         <div className="flex items-center gap-2 mt-2">
                             <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                             <p className="text-[10px] text-primary font-bold tracking-[0.4em] uppercase opacity-70">
-                                SECTOR // LVL_{level} // ASSET_LOCK
+                                SECTOR // {isElite ? 'FIXED_7x7' : `LVL_${level}`} // ASSET_LOCK
                             </p>
                         </div>
                     </div>
@@ -82,9 +86,51 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                             <Shield className="w-16 h-16 text-white" />
                         </div>
                         <span className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] mb-2 block">REQUIRED_STAKE</span>
-                        <div className="flex items-baseline gap-3">
-                            <span className="text-5xl font-black text-white tracking-tighter">{stakeAmount}</span>
-                            <span className="text-xs font-black text-primary tracking-widest uppercase">CREDITS</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-baseline gap-3">
+                                {onStakeChange ? (
+                                    <div className="flex items-baseline gap-2 group/input">
+                                        <input 
+                                            type="text" 
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            value={stakeAmount === 0 ? '' : stakeAmount}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/\D/g, '');
+                                                onStakeChange(val === '' ? 0 : parseInt(val));
+                                            }}
+                                            onBlur={() => {
+                                                if (stakeAmount < 1) onStakeChange(1);
+                                            }}
+                                            className="bg-transparent text-5xl font-black text-white tracking-tighter w-40 focus:outline-none border-b-2 border-primary/50 transition-all hover:border-white/10"
+                                        />
+                                        <span className="text-xs font-black text-primary tracking-widest uppercase animate-pulse">EDIT_VAL</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-baseline gap-3">
+                                        <span className="text-5xl font-black text-white tracking-tighter">{stakeAmount}</span>
+                                        <span className="text-xs font-black text-primary tracking-widest uppercase">CREDITS</span>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {onStakeChange && (
+                                <div className="flex items-center gap-2 bg-black/40 border border-white/10 p-1 rounded-lg">
+                                    <button 
+                                        onClick={() => onStakeChange(Math.max(10, stakeAmount - 10))}
+                                        className="p-3 hover:bg-white/10 transition-colors text-primary rounded-md active:scale-90"
+                                    >
+                                        <Minus className="w-5 h-5" />
+                                    </button>
+                                    <div className="w-[1px] h-6 bg-white/10" />
+                                    <button 
+                                        onClick={() => onStakeChange(stakeAmount + 10)}
+                                        className="p-3 hover:bg-white/10 transition-colors text-primary rounded-md active:scale-90"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -103,7 +149,7 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                 {/* Status Log */}
                 <div className="mb-10 font-mono space-y-1">
                     <p className="text-[9px] text-white/30 uppercase tracking-widest">&gt; INITIALIZING SECURE PROTOCOL...</p>
-                    <p className="text-[9px] text-primary uppercase tracking-widest animate-pulse">&gt; READY TO LOCK ASSETS FOR LEVEL {level}</p>
+                    <p className="text-[9px] text-primary uppercase tracking-widest animate-pulse">&gt; READY TO LOCK ASSETS FOR {isElite ? 'ELITE ARENA' : `LEVEL ${level}`}</p>
                 </div>
 
                 {/* Action Buttons */}

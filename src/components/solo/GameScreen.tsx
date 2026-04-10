@@ -11,6 +11,9 @@ import { LossStakingCard } from './LossStakingCard';
 export const GameScreen = () => {
     const { solo, clickTile, setSoloStatus, startLevel, nextLevel } = useGameStore();
     
+    const isElite = solo.level > 3;
+    const currentStake = isElite ? solo.stake : (solo.level * 10);
+
     // Win Overlay Component
     const WinOverlay = () => (
         <motion.div 
@@ -28,8 +31,16 @@ export const GameScreen = () => {
                 
                 <h2 className="text-7xl font-black text-primary mb-2 tracking-tighter leading-none neon-text">SYSTEM_BREACHED</h2>
                 <div className="h-2 w-full bg-primary/20 mb-6" />
-                <p className="text-xl text-white mb-2 tracking-[0.3em] font-black uppercase">TREASURE_SECURED // LVL_{solo.level}_CLEAR</p>
-                <p className="text-4xl text-primary font-black mb-10 tracking-widest">+ {solo.score} CREDITS</p>
+                <p className="text-xl text-white mb-2 tracking-[0.3em] font-black uppercase">{isElite ? 'ELITE_ARENA_SECURED' : `TREASURE_SECURED // LVL_${solo.level}_CLEAR`}</p>
+                <div className="flex flex-col mb-10">
+                    <span className="text-[10px] text-gray-500 font-black uppercase tracking-[0.4em]">STAKE: {currentStake} BQT</span>
+                    <p className="text-4xl text-primary font-black tracking-widest">+ {solo.score} CREDITS</p>
+                    {isElite && (
+                        <span className="text-[11px] text-primary/60 font-black uppercase mt-2">
+                            REWARD SCALED BY {Math.max(1, solo.revealedTiles.size)}X TILE MULTIPLIER
+                        </span>
+                    )}
+                </div>
                 
                 <div className="flex gap-6 justify-center relative z-10">
                     <button
@@ -43,7 +54,7 @@ export const GameScreen = () => {
                         className="px-12 py-4 bg-primary text-black font-black uppercase text-sm tracking-[0.4em] hover:bg-white transition-all shadow-xl group"
                         style={{ clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0 100%)' }}
                     >
-                        NEXT_PHASE {"->"}
+                        {isElite ? 'RE-SCAN' : 'NEXT_PHASE'} {"->"}
                     </button>
                 </div>
             </motion.div>
@@ -96,7 +107,7 @@ export const GameScreen = () => {
                 {solo.gameStatus === 'lost' && (
                     <LossStakingCard 
                         level={solo.level}
-                        amountLost={solo.level * 10} // Matches the staking amount
+                        amountLost={currentStake}
                         onRetry={() => startLevel(solo.level)}
                         onExit={() => setSoloStatus('selecting')}
                     />
@@ -115,7 +126,7 @@ export const GameScreen = () => {
                                 <span className="text-[9px] text-primary font-black tracking-[0.3em] uppercase">Sector_Sync</span>
                             </div>
                             <span className="text-xl font-black tracking-tighter text-white uppercase neon-text">
-                                UNIT_LVL_{solo.level}
+                                {isElite ? 'ELITE_ARENA' : `UNIT_LVL_${solo.level}`}
                             </span>
                         </div>
                         
@@ -127,7 +138,7 @@ export const GameScreen = () => {
                                 <span className="text-[9px] text-secondary font-black tracking-[0.3em] uppercase">Energy_Reserve</span>
                             </div>
                             <span className={`text-xl font-black tracking-tighter uppercase ${solo.movesLeft <= 1 ? 'text-warning' : 'text-secondary neon-text-secondary'}`}>
-                                {solo.movesLeft} / {solo.totalMoves} CHARGE
+                                {solo.movesLeft} / {solo.totalMoves} CHANCES
                             </span>
                         </div>
                     </div>
@@ -150,7 +161,7 @@ export const GameScreen = () => {
                 <motion.div 
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="grid gap-2 bg-background p-4 border-2 border-primary/30 shadow-[0_0_50px_rgba(0,242,255,0.1)] relative z-30"
+                    className={`grid gap-2 bg-background p-4 border-2 border-primary/30 shadow-[0_0_50px_rgba(0,242,255,0.1)] relative z-30 ${solo.gridSize >= 6 ? 'p-2' : 'p-4'}`}
                     style={{ 
                         gridTemplateColumns: `repeat(${solo.gridSize}, minmax(0, 1fr))`,
                         width: 'min(75vh, 90vw)',

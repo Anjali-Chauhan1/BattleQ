@@ -6,7 +6,9 @@ import { useGameStore } from '@/store/useGameStore';
 
 export const LevelSelectionScreen = () => {
     const { solo, startLevel } = useGameStore();
-    const levels = Array.from({ length: 12 }, (_, i) => i + 1);
+
+    const practiceLevels = [1, 2, 3];
+    const isEliteUnlocked = solo.unlockedLevel > 3;
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4 select-none">
@@ -16,68 +18,113 @@ export const LevelSelectionScreen = () => {
                 className="text-center mb-12"
             >
                 <h2 className="text-4xl font-black text-white tracking-widest uppercase mb-2">
-                    Phase_Selection
+                    Mission_Selection
                 </h2>
                 <div className="h-1 w-32 bg-primary mx-auto opacity-50" />
             </motion.div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl w-full">
-                {levels.map((lvl) => {
-                    const isCompleted = lvl < solo.unlockedLevel;
-                    const isCurrent = lvl === solo.unlockedLevel;
-                    const isLocked = lvl > solo.unlockedLevel;
+            <div className="w-full max-w-5xl space-y-12">
+                {/* Practice / Beginner Levels */}
+                <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-primary/30" />
+                        <span className="text-[10px] text-primary font-black uppercase tracking-[0.5em]">Practice_Protocols</span>
+                        <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-primary/30" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {practiceLevels.map((lvl) => {
+                            const isCompleted = lvl < solo.unlockedLevel;
+                            const isCurrent = lvl === solo.unlockedLevel;
+                            const isLocked = lvl > solo.unlockedLevel;
 
-                    return (
-                        <motion.button
-                            key={lvl}
-                            whileHover={!isLocked ? { scale: 1.05, y: -5 } : {}}
-                            whileTap={!isLocked ? { scale: 0.95 } : {}}
-                            onClick={() => !isLocked && startLevel(lvl)}
-                            disabled={isLocked}
-                            className={`
-                                relative h-32 rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300
-                                ${isCurrent ? 'border-primary bg-primary/10 shadow-[0_0_30px_rgba(0,242,255,0.2)]' : ''}
-                                ${isCompleted ? 'border-secondary/50 bg-secondary/5 opacity-80' : ''}
-                                ${isLocked ? 'border-white/10 bg-white/5 opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-                            `}
-                            style={{ clipPath: 'polygon(0 0, 90% 0, 100% 15%, 100% 100%, 10% 100%, 0 85%)' }}
-                        >
-                            {/* Level Number */}
-                            <span className={`text-4xl font-black ${isCurrent ? 'text-primary' : 'text-white'}`}>
-                                {lvl < 10 ? `0${lvl}` : lvl}
-                            </span>
+                            return (
+                                <motion.button
+                                    key={lvl}
+                                    whileHover={!isLocked ? { scale: 1.02, y: -5 } : {}}
+                                    whileTap={!isLocked ? { scale: 0.98 } : {}}
+                                    onClick={() => !isLocked && startLevel(lvl)}
+                                    disabled={isLocked}
+                                    className={`
+                                        relative h-40 rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300 overflow-hidden
+                                        ${isCurrent ? 'border-primary bg-primary/10 shadow-[0_0_40px_rgba(0,242,255,0.15)]' : ''}
+                                        ${isCompleted ? 'border-secondary/40 bg-secondary/5 opacity-80' : ''}
+                                        ${isLocked ? 'border-white/10 bg-white/5 opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+                                    `}
+                                    style={{ clipPath: 'polygon(0 0, 92% 0, 100% 12%, 100% 100%, 8% 100%, 0 88%)' }}
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100" />
+                                    
+                                    <span className={`text-5xl font-black italic tracking-tighter ${isCurrent ? 'text-primary neon-text' : 'text-white'}`}>
+                                        LVL_0{lvl}
+                                    </span>
 
-                            {/* Status Icon */}
-                            <div className="absolute top-2 right-2">
-                                {isCompleted && <CheckCircle2 className="w-5 h-5 text-secondary" />}
-                                {isCurrent && <Play className="w-5 h-5 text-primary animate-pulse" />}
-                                {isLocked && <Lock className="w-5 h-5 text-gray-500" />}
+                                    <div className="absolute top-3 right-3">
+                                        {isCompleted && <CheckCircle2 className="w-6 h-6 text-secondary shadow-[0_0_10px_rgba(34,197,94,0.5)]" />}
+                                        {isCurrent && <Play className="w-6 h-6 text-primary animate-pulse shadow-[0_0_15px_rgba(0,242,255,1)]" />}
+                                        {isLocked && <Lock className="w-6 h-6 text-gray-600" />}
+                                    </div>
+
+                                    <span className="text-[11px] font-black uppercase tracking-[0.3em] mt-3 opacity-60">
+                                        {isLocked ? 'ENCRYPTED' : 'BEGINNER_PHASE'}
+                                    </span>
+                                </motion.button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Elite Arena - Goal / Continuous Mode */}
+                <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-accent/30" />
+                        <span className="text-[10px] text-accent font-black uppercase tracking-[0.5em]">The_Elite_Arena</span>
+                        <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-accent/30" />
+                    </div>
+
+                    <motion.button
+                        whileHover={isEliteUnlocked ? { scale: 1.01 } : {}}
+                        whileTap={isEliteUnlocked ? { scale: 0.99 } : {}}
+                        onClick={() => isEliteUnlocked && startLevel(4)}
+                        disabled={!isEliteUnlocked}
+                        className={`
+                            relative w-full py-12 px-8 border-2 flex flex-col md:flex-row items-center justify-between transition-all duration-500 overflow-hidden
+                            ${isEliteUnlocked 
+                                ? 'border-accent bg-accent/10 shadow-[0_0_60px_rgba(168,85,247,0.2)] cursor-pointer' 
+                                : 'border-white/10 bg-white/5 opacity-50 cursor-not-allowed'}
+                        `}
+                        style={{ clipPath: 'polygon(5% 0, 100% 0, 95% 100%, 0 100%)' }}
+                    >
+                        <div className="flex flex-col items-center md:items-start text-center md:text-left gap-2 relative z-10">
+                            <h3 className={`text-4xl font-black tracking-tighter uppercase italic ${isEliteUnlocked ? 'text-accent neon-text-accent' : 'text-gray-500'}`}>
+                                ENTER_ELITE_ARENA
+                            </h3>
+                            <p className="text-[11px] font-bold text-white/50 tracking-widest uppercase">
+                                {isEliteUnlocked 
+                                    ? '6x6 FIXED GRID // PERSISTENT STAKING // UNRESTRICTED YIELD' 
+                                    : 'REQUIREMENT: CLEAR PRACTICE PHASES 01-03'}
+                            </p>
+                        </div>
+
+                        {isEliteUnlocked ? (
+                            <div className="flex items-center gap-4 mt-6 md:mt-0 relative z-10">
+                                <div className="flex flex-col items-end">
+                                    <span className="text-[9px] text-accent font-black uppercase tracking-widest">Protocol_Active</span>
+                                    <span className="text-xl font-black text-white italic tracking-tighter">UNLIMITED_OPS</span>
+                                </div>
+                                <div className="p-4 bg-accent/20 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.5)]">
+                                    <ChevronRight className="w-10 h-10 text-accent animate-pulse" />
+                                </div>
                             </div>
+                        ) : (
+                            <Lock className="w-12 h-12 text-gray-700 mt-6 md:mt-0 opacity-50" />
+                        )}
 
-                            {/* Label */}
-                            <span className="text-[10px] font-bold uppercase tracking-widest mt-2">
-                                {isLocked ? 'Locked' : 'Level'}
-                            </span>
-                        </motion.button>
-                    );
-                })}
+                        {/* Background Decor */}
+                        <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-accent/5 rounded-full blur-[80px]" />
+                    </motion.button>
+                </div>
             </div>
-
-            <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-16"
-            >
-                <button
-                    onClick={() => startLevel(solo.unlockedLevel)}
-                    className="group relative px-12 py-4 bg-primary text-black font-black uppercase text-sm tracking-[0.4em] transition-all hover:bg-white active:scale-95"
-                    style={{ clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0 100%)' }}
-                >
-                    <span className="flex items-center gap-2">
-                        Continue_Hunt <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                </button>
-            </motion.div>
         </div>
     );
 };
