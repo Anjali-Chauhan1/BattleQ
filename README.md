@@ -1,6 +1,6 @@
 # BATTLEQ: Tactical Web3 Arena 🛡️
 
-**BattleQ** is a high-octane, real-time multiplayer strategy game built for the next generation of on-chain gaming. Maneuver through a shifting 15x15 tactical grid, form strategic alliances, and out-smart your opponents in a behavior-driven arena.
+**BattleQ** is a high-octane tactical grid-based strategy game. Navigate through shifting sectors, manage high-stakes energy reserves, and extract rare treasures in a high-fidelity "Cyber-Cinematic" environment.
 
 ![BattleQ Banner](https://img.shields.io/badge/BattleQ-Cyber--Tactical-00f2ff)
 ![License](https://img.shields.io/badge/Status-Operational-green)
@@ -8,28 +8,40 @@
 
 ## 🕹️ Core Gameplay Mechanics
 
-### 1. Dynamic Sector Migration
-The arena is alive. Capture zones (Yellow Sectors) relocate every **30 seconds**. Stagnation is death—operatives must constantly re-position to stay in the yield.
+### 1. Solo Extraction (The Hunt)
+*   **Mission Sync**: Lock your credits before entering a sector. Stake 10 credits per level.
+*   **Tactical Grid**: Navigate a dynamic grid (`3x3` to `10x10`) to find the hidden treasure.
+*   **Energy Management**: Every scan costs charge. Run out of energy, and your stake is **liquidated**.
+*   **3D Interaction**: On-click reveals feature a 3D chest opening animation with particle bursts.
 
-### 2. Tactical Alliances & Betrayal
-*   **Pact Formation**: Request a vision link with nearby players to share yields (+10 alliance bonus).
-*   **The Snatch Mechanic**: Betray your allies to seize their tokens instantly, but at the cost of your global Reputation.
-*   **Split Yield**: Cooperatively divide resources in Alliance mode for stable, long-term gains.
+### 2. High-Stakes Rewards
+*   **Yield Curve**: Successfully extracting treasures returns your stake plus a level-based bonus.
+    *   *Level 1*: Stake 10 → Yield **20**
+    *   *Level 2*: Stake 20 → Yield **35**
+*   **Liquidated Assets**: Failing a mission results in a "Disturbing" system failure screen and forfeiture of staked credits.
 
-### 3. Smart Scoring Engine
-Feedback is authentic. Points are earned through:
-*   **Passive Yield**: +5/sec inside capture zones.
-*   **Strike Engagement**: +25 for successful combat maneuvers.
-*   **Discovery Bonus**: Rewards for being the first to enter a newly relocated sector.
+### 3. Progressive Difficulty
+*   **Trap Detection**: Levels 2+ introduce trap tiles that drain double energy.
+*   **Fake Signals**: Multiple fake treasures appear as you advance.
+*   **Dynamic Scaling**: Grid size and scan success ratios tighten as you climb the ranks.
+
+---
+
+## 👤 Operative Profile & Intelligence
+*   **Strategic Mission Log**: Track your last 5 operations with detailed results and rewards.
+*   **Tactical Win Ratio**: Real-time calculation of your success percentage.
+*   **Rank Progression**: Advance from **Sector Scout** to **Elite Guard** and **Centurion Prime**.
+*   **Global Score**: Persistent credit tracking with rank-based tiering.
 
 ---
 
 ## 🚀 Technical Stack
 
-*   **Frontend**: [Next.js 14](https://nextjs.org/) (App Router), [Tailwind CSS](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
-*   **Backend**: [Node.js](https://nodejs.org/) & [Socket.io](https://socket.io/) for real-time synchronization.
+*   **Frontend**: [Next.js 15](https://nextjs.org/) (App Router), [Tailwind CSS](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
+*   **State Management**: [Zustand](https://zustand-demo.pmnd.rs/) with deep mission history persistence.
+*   **Animation Engine**: Complex 3D CSS transforms and SVG-based glitch filters.
 *   **Icons**: [Lucide React](https://lucide.dev/).
-*   **State Management**: [Zustand](https://zustand-demo.pmnd.rs/) with Persistence.
+*   **Backend**: Node.js & Socket.io (for future multiplayer scalability).
 
 ---
 
@@ -41,14 +53,7 @@ Clone the repository and install tactical dependencies:
 npm install
 ```
 
-### 2. Deploy Game Engine (Server)
-Start the Socket.io backend in a separate terminal:
-```bash
-npm run server
-```
-*Note: Make sure port 3001 is available.*
-
-### 3. Launch Operational Console (Client)
+### 2. Launch Operational Console (Client)
 Start the Next.js development server:
 ```bash
 npm run dev
@@ -57,28 +62,21 @@ Open [http://localhost:3000](http://localhost:3000) to begin your mission.
 
 ---
 
-## 📐 Design Philosophy: "Cyber-Cinematic"
-BattleQ utilizes a custom **Glass-Panel Design System**.
-*   **High-Contrast HSL Palettes**: Deep blacks (#020203) with Neon Blue (Primary) and Magenta (Accent).
-*   **Spatial Hierarchy**: 7xl standard containers with consistent vertical rhythms.
-*   **Motion Intelligence**: Viewport-aware tooltips and layout animations that react to the grid's state.
-
----
-
 ## 📂 Project Structure
 
 ```text
 ├── src/
 │   ├── app/            # Tactical Routes (Lobby, Arena, Profile)
-│   ├── components/     # UI/UX Modules (Tutorial, RoomCard, HUD)
-│   ├── hooks/          # Operational Hooks (useSocket)
-│   ├── server/         # Game Engine Logic (Socket.io)
-│   └── store/          # Global Persistence & State
+│   ├── components/     
+│   │   ├── solo/       # Mission Logic (Grid, Staking, Loss/Win Cards)
+│   │   └── ui/         # Glass-Panel Design System
+│   ├── store/          # Global Persistence & Difficulty Logic
+│   └── lib/            # User & Contract Protocols
 ```
 
 ---
 
 ## ⚠️ Tactical Warning
-This is a high-stakes environment. All decisions are final. Maintain your Reputation to unlock Elite-grade sectors.
+This is a high-stakes environment. Unauthorized disconnects or energy depletion will result in immediate asset liquidation.
 
 **Status: READY FOR DEPLOYMENT.**
