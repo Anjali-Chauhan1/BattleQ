@@ -172,10 +172,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextMoves = Math.max(0, solo.movesLeft - movesUsed);
 
     if (isTreasure) {
-      // Winning Logic: Level 1 (Stake 10) wins 20, Level 2 (Stake 20) wins 35, etc.
-      // Calculation: Stake + (Level * 5) + 5
+    
       const stakeAmount = solo.level * 10;
-      const winAmount = stakeAmount + (solo.level * 5) + 5;
+      const winAmount = stakeAmount + (solo.level * 5) - 3;
       
       set((state) => ({
         solo: {
@@ -186,7 +185,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           unlockedLevel: Math.max(state.solo.unlockedLevel, solo.level + 1),
           history: [
             {
-              result: 'SUCCESS',
+              result: 'SUCCESS' as const,
               reward: `+${winAmount}`,
               level: solo.level,
               date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -207,7 +206,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           score: Math.max(0, state.solo.score - lossAmount),
           history: [
             {
-              result: 'FAILED',
+              result: 'FAILED' as const,
               reward: `-${lossAmount}`,
               level: solo.level,
               date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
