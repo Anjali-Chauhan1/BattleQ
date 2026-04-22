@@ -2,11 +2,10 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { useSocket } from "@/hooks/useSocket";
 import { useGameStore } from "@/store/useGameStore";
-import { getGuestUser } from "@/lib/user";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { TutorialTour } from "@/components/game/TutorialTour";
+import { MultiplayerGameScreen } from "@/components/game/MultiplayerGameScreen";
 
 // Solo System Imports
 import { LevelSelectionScreen } from "@/components/solo/LevelSelectionScreen";
@@ -15,15 +14,29 @@ import { GameScreen } from "@/components/solo/GameScreen";
 import { StakeConfirmation } from "@/components/solo/StakeConfirmation";
 
 export default function Arena() {
+    const [mode, setMode] = useState("solo");
     const { solo, setSoloStatus, startLevel, setStake } = useGameStore();
     const [showTour, setShowTour] = useState(false);
-    
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        setMode(params.get("mode") || "solo");
+    }, []);
+
     useEffect(() => {
         const hasSeenTour = localStorage.getItem('battleq_tour_v2');
         if (!hasSeenTour) {
             setShowTour(true);
         }
     }, []);
+
+    if (mode === "duel") {
+        return (
+            <AuthGuard>
+                <MultiplayerGameScreen />
+            </AuthGuard>
+        );
+    }
 
     const completeTour = () => {
         setShowTour(false);

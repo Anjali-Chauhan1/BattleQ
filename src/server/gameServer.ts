@@ -15,6 +15,10 @@ const io = new Server(httpServer, {
 });
 
 const PORT = 3001;
+const DUEL_GRID_SIZE = 6;
+const DUEL_BET_AMOUNT = 10;
+
+type ChestItem = 'gun' | 'health' | 'skip' | 'empty';
 
 interface PlayerState {
   id: string;
@@ -32,6 +36,18 @@ interface PlayerState {
   wins: number;
 }
 
+interface DuelRoundState {
+  gridSize: number;
+  board: Record<string, ChestItem>;
+  revealed: Record<string, boolean>;
+  turnPlayerId: string | null;
+  lives: Record<string, number>;
+  skipNextFor: string | null;
+  winnerId: string | null;
+  betAmount: number;
+  totalPot: number;
+}
+
 const rooms: Record<string, {
   players: Record<string, PlayerState>;
   status: 'waiting' | 'playing' | 'ended';
@@ -45,7 +61,107 @@ const rooms: Record<string, {
     hintY: number;
     hintTruth: boolean;
   };
+  duelRound?: DuelRoundState;
 }> = {};
+
+function getDuelPlayers(roomId: string): PlayerState[] {
+  const room = rooms[roomId];
+  if (!room) return [];
+  return Object.values(room.players).filter((p) => !p.isBot).slice(0, 2);
+}
+
+function emitDuelState(roomId: string) {
+  const room = rooms[roomId];
+  if (!room || !room.duelRound) return;
+
+  const duelRound = room.duelRound;
+  const tiles: Array<{ x: number; y: number; revealed: boolean; item?: ChestItem }> = [];
+
+  for (let y = 0; y < duelRound.gridSize; y++) {
+    for (let x = 0; x < duelRound.gridSize; x++) {
+      const key = `${x},${y}`;
+      const revealed = Boolean(duelRound.revealed[key]);
+      tiles.push({
+        x,
+        y,
+        revealed,
+        item: revealed ? duelRound.board[key] : undefined,
+      });
+    }
+  }
+
+  io.to(roomId).emit('duel_state', {
+    roomId,
+    status: room.status,
+    gridSize: duelRound.gridSize,
+    tiles,
+    turnPlayerId: duelRound.turnPlayerId,
+    lives: duelRound.lives,
+    winnerId: duelRound.winnerId,
+    betAmount: duelRound.betAmount,
+    totalPot: duelRound.totalPot,
+    players: getDuelPlayers(roomId).map((p) => ({ id: p.id, name: p.name })),
+  });
+}
+
+function initializeDuelRound(roomId: string) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const duelPlayers = getDuelPlayers(roomId);
+  if (duelPlayers.length < 2) return;
+
+  const totalTiles = DUEL_GRID_SIZE * DUEL_GRID_SIZE;
+  const chestPool: ChestItem[] = [
+    ...Array(8).fill('gun'),
+    ...Array(6).fill('health'),
+    ...Array(6).fill('skip'),
+    ...Array(totalTiles - 20).fill('empty'),
+  ];
+
+  for (let i = chestPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chestPool[i], chestPool[j]] = [chestPool[j], chestPool[i]];
+  }
+
+  const board: Record<string, ChestItem> = {};
+  const revealed: Record<string, boolean> = {};
+  let index = 0;
+
+  for (let y = 0; y < DUEL_GRID_SIZE; y++) {
+    for (let x = 0; x < DUEL_GRID_SIZE; x++) {
+      const key = `${x},${y}`;
+      board[key] = chestPool[index] || 'empty';
+      revealed[key] = false;
+      index += 1;
+    }
+  }
+
+  const firstTurnPlayer = duelPlayers[Math.floor(Math.random() * duelPlayers.length)].id;
+
+  room.duelRound = {
+    gridSize: DUEL_GRID_SIZE,
+    board,
+    revealed,
+    turnPlayerId: firstTurnPlayer,
+    lives: {
+      [duelPlayers[0].id]: 3,
+      [duelPlayers[1].id]: 3,
+    },
+    skipNextFor: null,
+    winnerId: null,
+    betAmount: DUEL_BET_AMOUNT,
+    totalPot: DUEL_BET_AMOUNT * duelPlayers.length,
+  };
+
+  io.to(roomId).emit('game_event', {
+    type: 'duel_bet_locked',
+    betAmount: room.duelRound.betAmount,
+    totalPot: room.duelRound.totalPot,
+  });
+
+  emitDuelState(roomId);
+}
 
 // --- AI ENGINE ---
 const AI_NAMES = [
@@ -138,7 +254,7 @@ io.on('connection', (socket: Socket) => {
   socket.on('join_match', (data: { name: string; role: string; level?: number; mode?: string }) => {
     const gameMode = data.mode || 'solo';
     let roomId = Object.keys(rooms).find(r => 
-        Object.keys(rooms[r].players).length < 6 && 
+        Object.keys(rooms[r].players).length < (gameMode === 'duel' ? 2 : 6) && 
         rooms[r].status === 'waiting' &&
         rooms[r].mode === gameMode
     );
@@ -177,6 +293,8 @@ io.on('connection', (socket: Socket) => {
 
     if (rooms[roomId].mode === 'solo') {
       startMatch(roomId);
+    } else if (rooms[roomId].mode === 'duel' && Object.keys(rooms[roomId].players).length === 2) {
+      startMatch(roomId);
     } else if (Object.keys(rooms[roomId].players).length >= 2) {
       startMatch(roomId);
     }
@@ -193,12 +311,79 @@ io.on('connection', (socket: Socket) => {
     startSoloRound(roomId);
   });
 
+  socket.on('request_duel_state', (data: { roomId: string }) => {
+    const room = rooms[data.roomId];
+    if (!room || room.mode !== 'duel') return;
+    emitDuelState(data.roomId);
+  });
+
   socket.on('player_action', (data: { roomId: string; action: string; targetId?: string; x?: number; y?: number; bet?: number }) => {
     const { roomId, action, x, y, targetId, bet } = data;
     const room = rooms[roomId];
     if (!room || !room.players[socket.id]) return;
 
     const player = room.players[socket.id];
+
+    if (room.mode === 'duel' && action === 'open_chest') {
+      const duelRound = room.duelRound;
+      const duelPlayers = getDuelPlayers(roomId);
+      if (!duelRound || duelPlayers.length < 2) return;
+      if (duelRound.winnerId || room.status !== 'playing') return;
+      if (duelRound.turnPlayerId !== player.id) return;
+      if (x === undefined || y === undefined) return;
+      if (x < 0 || x >= duelRound.gridSize || y < 0 || y >= duelRound.gridSize) return;
+
+      const key = `${x},${y}`;
+      if (duelRound.revealed[key]) return;
+
+      duelRound.revealed[key] = true;
+      const item = duelRound.board[key];
+      const opponent = duelPlayers.find((p) => p.id !== player.id);
+      if (!opponent) return;
+
+      if (item === 'gun') {
+        duelRound.lives[opponent.id] = Math.max(0, (duelRound.lives[opponent.id] ?? 3) - 1);
+        player.lastAction = 'chest_gun';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'gun', from: player.id, to: opponent.id });
+      } else if (item === 'health') {
+        duelRound.lives[player.id] = Math.min(3, (duelRound.lives[player.id] ?? 3) + 1);
+        player.lastAction = 'chest_health';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'health', from: player.id });
+      } else if (item === 'skip') {
+        duelRound.skipNextFor = opponent.id;
+        player.lastAction = 'chest_skip';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'skip', from: player.id, to: opponent.id });
+      } else {
+        player.lastAction = 'chest_empty';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'empty', from: player.id });
+      }
+
+      if ((duelRound.lives[opponent.id] ?? 0) <= 0) {
+        duelRound.winnerId = player.id;
+        room.status = 'ended';
+        player.wins += 1;
+        io.to(roomId).emit('match_ended', {
+          leaderboard: duelPlayers
+            .map((p) => ({ ...p, score: duelRound.lives[p.id] ?? 0 }))
+            .sort((a, b) => (duelRound.lives[b.id] ?? 0) - (duelRound.lives[a.id] ?? 0)),
+          winnerId: duelRound.winnerId,
+          betAmount: duelRound.betAmount,
+          totalPot: duelRound.totalPot,
+          payout: duelRound.totalPot,
+        });
+      } else {
+        let nextTurn = opponent.id;
+        if (duelRound.skipNextFor === nextTurn) {
+          duelRound.skipNextFor = null;
+          nextTurn = player.id;
+          io.to(roomId).emit('game_event', { type: 'duel_turn_skipped', skippedPlayerId: opponent.id, by: player.id });
+        }
+        duelRound.turnPlayerId = nextTurn;
+      }
+
+      emitDuelState(roomId);
+      return;
+    }
 
     // Solo game rules
     if (room.mode === 'solo' && room.soloRound) {
@@ -275,6 +460,23 @@ io.on('connection', (socket: Socket) => {
     for (const roomId in rooms) {
       if (rooms[roomId].players[socket.id]) {
         delete rooms[roomId].players[socket.id];
+
+        if (rooms[roomId].mode === 'duel' && rooms[roomId].duelRound && rooms[roomId].status === 'playing') {
+          const remaining = getDuelPlayers(roomId);
+          if (remaining.length === 1) {
+            rooms[roomId].duelRound.winnerId = remaining[0].id;
+            rooms[roomId].status = 'ended';
+            io.to(roomId).emit('match_ended', {
+              winnerId: remaining[0].id,
+              leaderboard: remaining,
+              betAmount: rooms[roomId].duelRound.betAmount,
+              totalPot: rooms[roomId].duelRound.totalPot,
+              payout: rooms[roomId].duelRound.totalPot,
+            });
+          }
+          emitDuelState(roomId);
+        }
+
         io.to(roomId).emit('player_left', { players: rooms[roomId].players });
       }
     }
@@ -291,6 +493,12 @@ function startMatch(roomId: string) {
   // Solo mode: simple dealer/round system, no bots or timers
   if (room.mode === 'solo') {
     startSoloRound(roomId);
+    return;
+  }
+
+  // Duel mode: two-player shared chest grid with turn-based effects
+  if (room.mode === 'duel') {
+    initializeDuelRound(roomId);
     return;
   }
 
