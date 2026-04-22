@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Heart, Crosshair, ShieldPlus, SkipForward, Users } from "lucide-react";
+import { Heart, Crosshair, ShieldPlus, SkipForward, Users, Bomb, Search } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { getGuestUser } from "@/lib/user";
 
-type ChestItem = "gun" | "health" | "skip" | "empty";
+type ChestItem = "gun" | "health" | "skip" | "double_kill" | "magnifier" | "empty";
 
 interface DuelTile {
   x: number;
@@ -28,6 +28,8 @@ interface DuelState {
   tiles: DuelTile[];
   turnPlayerId: string | null;
   lives: Record<string, number>;
+  maxLives: number;
+  peekCharges: Record<string, number>;
   winnerId: string | null;
   betAmount: number;
   totalPot: number;
@@ -38,13 +40,17 @@ const itemToIcon: Record<ChestItem, React.ReactNode> = {
   gun: <Crosshair className="w-6 h-6 text-red-400" />,
   health: <ShieldPlus className="w-6 h-6 text-emerald-400" />,
   skip: <SkipForward className="w-6 h-6 text-amber-300" />,
+  double_kill: <Bomb className="w-6 h-6 text-fuchsia-400" />,
+  magnifier: <Search className="w-6 h-6 text-cyan-300" />,
   empty: <span className="text-xs text-white/30">EMPTY</span>,
 };
 
 const itemToLabel: Record<ChestItem, string> = {
   gun: "Gun: -1 life to opponent",
-  health: "Health: +1 life (max 3)",
+  health: "Health: +1 life (max 5)",
   skip: "Skip: opponent loses next turn",
+  double_kill: "Double Kill: -2 lives to opponent",
+  magnifier: "Magnifier: inspect one tile without opening",
   empty: "Empty chest",
 };
 
@@ -54,12 +60,15 @@ export function MultiplayerGameScreen() {
   const [duelState, setDuelState] = useState<DuelState | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("Connecting...");
+  const [isPeekMode, setIsPeekMode] = useState(false);
+  const [peekedTiles, setPeekedTiles] = useState<Record<string, ChestItem>>({});
 
   const myId = socket?.id;
   const me = duelState?.players.find((p) => p.id === myId);
   const opponent = duelState?.players.find((p) => p.id !== myId);
   const isMyTurn = Boolean(duelState && myId && duelState.turnPlayerId === myId);
   const winner = duelState?.players.find((p) => p.id === duelState?.winnerId);
+  const myPeekCharges = myId ? (duelState?.peekCharges?.[myId] ?? 0) : 0;
 
   useEffect(() => {
     if (!socket || !isConnected) return;
@@ -86,6 +95,11 @@ export function MultiplayerGameScreen() {
       }
     };
 
+    const onPeekResult = (payload: { x: number; y: number; item: ChestItem }) => {
+      const key = `${payload.x}-${payload.y}`;
+      setPeekedTiles((prev) => ({ ...prev, [key]: payload.item }));
+    };
+
     const onPlayerLeft = () => {
       setStatusText("Opponent disconnected");
     };
@@ -93,6 +107,7 @@ export function MultiplayerGameScreen() {
     socket.on("player_joined", onPlayerJoined);
     socket.on("match_started", onMatchStarted);
     socket.on("duel_state", onDuelState);
+    socket.on("duel_peek_result", onPeekResult);
     socket.on("player_left", onPlayerLeft);
 
     const guestUser = getGuestUser();
@@ -106,9 +121,21 @@ export function MultiplayerGameScreen() {
       socket.off("player_joined", onPlayerJoined);
       socket.off("match_started", onMatchStarted);
       socket.off("duel_state", onDuelState);
+      socket.off("duel_peek_result", onPeekResult);
       socket.off("player_left", onPlayerLeft);
     };
   }, [socket, isConnected]);
+
+  useEffect(() => {
+    if (!isMyTurn) {
+      setIsPeekMode(false);
+    }
+  }, [isMyTurn]);
+
+  useEffect(() => {
+    setPeekedTiles({});
+    setIsPeekMode(false);
+  }, [roomId]);
 
   const sortedTiles = useMemo(() => {
     if (!duelState) return [];
@@ -117,6 +144,18 @@ export function MultiplayerGameScreen() {
 
   const onTileClick = (x: number, y: number, revealed: boolean) => {
     if (!socket || !roomId || !isMyTurn || revealed || duelState?.status !== "playing") return;
+
+    if (isPeekMode && myPeekCharges > 0) {
+      socket.emit("player_action", {
+        roomId,
+        action: "peek_tile",
+        x,
+        y,
+      });
+      setIsPeekMode(false);
+      return;
+    }
+
     socket.emit("player_action", {
       roomId,
       action: "open_chest",
@@ -146,12 +185,33 @@ export function MultiplayerGameScreen() {
             <p className="text-xs uppercase tracking-widest text-emerald-300 mt-1">
               Pot: {duelState?.totalPot ?? 20} BQT
             </p>
+            <p className="text-xs uppercase tracking-widest text-cyan-300 mt-1">
+              Magnifier Charges: {myPeekCharges}
+            </p>
           </div>
         </header>
 
+        <section className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <p className="text-xs text-white/60 uppercase tracking-widest">
+            Lives increased to {duelState?.maxLives ?? 5}. Find Double Kill and Magnifier chests.
+          </p>
+          <button
+            onClick={() => setIsPeekMode((prev) => !prev)}
+            disabled={!isMyTurn || myPeekCharges <= 0 || duelState?.status !== "playing"}
+            className={`px-4 py-2 text-xs font-black uppercase tracking-widest border transition-all ${
+              isPeekMode
+                ? "border-cyan-300 text-cyan-300 bg-cyan-300/10"
+                : "border-white/25 text-white/80"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {isPeekMode ? "Peek Mode: ON" : "Use Magnifier"}
+          </button>
+        </section>
+
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           {[me, opponent].map((player, idx) => {
-            const lives = player ? (duelState?.lives[player.id] ?? 3) : 3;
+            const maxLives = duelState?.maxLives ?? 5;
+            const lives = player ? (duelState?.lives[player.id] ?? maxLives) : maxLives;
             return (
               <div key={player?.id || idx} className="border border-white/15 bg-black/50 p-4 md:p-5">
                 <div className="flex items-center justify-between">
@@ -162,7 +222,7 @@ export function MultiplayerGameScreen() {
                   <Users className="w-6 h-6 text-primary/80" />
                 </div>
                 <div className="mt-3 flex items-center gap-2">
-                  {Array.from({ length: 3 }).map((_, i) => (
+                  {Array.from({ length: maxLives }).map((_, i) => (
                     <Heart
                       key={i}
                       className={`w-6 h-6 ${i < lives ? "text-red-500 fill-red-500/80" : "text-white/20"}`}
@@ -191,19 +251,30 @@ export function MultiplayerGameScreen() {
                 className={`aspect-square border text-xs font-bold tracking-wide transition-all ${
                   tile.revealed
                     ? "border-primary/50 bg-primary/10"
+                    : peekedTiles[`${tile.x}-${tile.y}`]
+                      ? "border-cyan-300/70 bg-cyan-300/10"
                     : isMyTurn
                       ? "border-white/20 bg-white/5 hover:border-primary/60"
                       : "border-white/10 bg-white/[0.03]"
                 }`}
               >
-                {tile.revealed && tile.item ? itemToIcon[tile.item] : <span className="text-white/50">CHEST</span>}
+                {tile.revealed && tile.item
+                  ? itemToIcon[tile.item]
+                  : peekedTiles[`${tile.x}-${tile.y}`]
+                    ? (
+                      <div className="flex flex-col items-center gap-1">
+                        {itemToIcon[peekedTiles[`${tile.x}-${tile.y}`]]}
+                        <span className="text-[9px] text-cyan-300 uppercase">Scanned</span>
+                      </div>
+                    )
+                    : <span className="text-white/50">CHEST</span>}
               </motion.button>
             ))}
           </div>
         </section>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 text-sm">
-          {(["gun", "health", "skip"] as ChestItem[]).map((item) => (
+        <section className="grid grid-cols-1 md:grid-cols-5 gap-3 md:gap-4 text-sm">
+          {(["gun", "health", "skip", "double_kill", "magnifier"] as ChestItem[]).map((item) => (
             <div key={item} className="border border-white/15 bg-black/45 p-4 flex items-center gap-3">
               {itemToIcon[item]}
               <p className="text-white/80">{itemToLabel[item]}</p>

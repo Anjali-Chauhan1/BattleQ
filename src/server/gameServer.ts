@@ -17,8 +17,9 @@ const io = new Server(httpServer, {
 const PORT = 3001;
 const DUEL_GRID_SIZE = 6;
 const DUEL_BET_AMOUNT = 10;
+const DUEL_MAX_LIVES = 5;
 
-type ChestItem = 'gun' | 'health' | 'skip' | 'empty';
+type ChestItem = 'gun' | 'health' | 'skip' | 'double_kill' | 'magnifier' | 'empty';
 
 interface PlayerState {
   id: string;
@@ -42,6 +43,8 @@ interface DuelRoundState {
   revealed: Record<string, boolean>;
   turnPlayerId: string | null;
   lives: Record<string, number>;
+  maxLives: number;
+  peekCharges: Record<string, number>;
   skipNextFor: string | null;
   winnerId: string | null;
   betAmount: number;
@@ -97,6 +100,8 @@ function emitDuelState(roomId: string) {
     tiles,
     turnPlayerId: duelRound.turnPlayerId,
     lives: duelRound.lives,
+    maxLives: duelRound.maxLives,
+    peekCharges: duelRound.peekCharges,
     winnerId: duelRound.winnerId,
     betAmount: duelRound.betAmount,
     totalPot: duelRound.totalPot,
@@ -116,7 +121,9 @@ function initializeDuelRound(roomId: string) {
     ...Array(8).fill('gun'),
     ...Array(6).fill('health'),
     ...Array(6).fill('skip'),
-    ...Array(totalTiles - 20).fill('empty'),
+    ...Array(4).fill('double_kill'),
+    ...Array(4).fill('magnifier'),
+    ...Array(totalTiles - 28).fill('empty'),
   ];
 
   for (let i = chestPool.length - 1; i > 0; i--) {
@@ -145,8 +152,13 @@ function initializeDuelRound(roomId: string) {
     revealed,
     turnPlayerId: firstTurnPlayer,
     lives: {
-      [duelPlayers[0].id]: 3,
-      [duelPlayers[1].id]: 3,
+      [duelPlayers[0].id]: DUEL_MAX_LIVES,
+      [duelPlayers[1].id]: DUEL_MAX_LIVES,
+    },
+    maxLives: DUEL_MAX_LIVES,
+    peekCharges: {
+      [duelPlayers[0].id]: 0,
+      [duelPlayers[1].id]: 0,
     },
     skipNextFor: null,
     winnerId: null,
@@ -324,6 +336,28 @@ io.on('connection', (socket: Socket) => {
 
     const player = room.players[socket.id];
 
+    if (room.mode === 'duel' && action === 'peek_tile') {
+      const duelRound = room.duelRound;
+      if (!duelRound || room.status !== 'playing' || duelRound.winnerId) return;
+      if (duelRound.turnPlayerId !== player.id) return;
+      if ((duelRound.peekCharges[player.id] ?? 0) <= 0) return;
+      if (x === undefined || y === undefined) return;
+      if (x < 0 || x >= duelRound.gridSize || y < 0 || y >= duelRound.gridSize) return;
+
+      const key = `${x},${y}`;
+      if (duelRound.revealed[key]) return;
+
+      duelRound.peekCharges[player.id] = Math.max(0, (duelRound.peekCharges[player.id] ?? 0) - 1);
+      socket.emit('duel_peek_result', {
+        x,
+        y,
+        item: duelRound.board[key],
+      });
+      io.to(roomId).emit('game_event', { type: 'duel_item', item: 'magnifier_peek', from: player.id });
+      emitDuelState(roomId);
+      return;
+    }
+
     if (room.mode === 'duel' && action === 'open_chest') {
       const duelRound = room.duelRound;
       const duelPlayers = getDuelPlayers(roomId);
@@ -342,17 +376,25 @@ io.on('connection', (socket: Socket) => {
       if (!opponent) return;
 
       if (item === 'gun') {
-        duelRound.lives[opponent.id] = Math.max(0, (duelRound.lives[opponent.id] ?? 3) - 1);
+        duelRound.lives[opponent.id] = Math.max(0, (duelRound.lives[opponent.id] ?? DUEL_MAX_LIVES) - 1);
         player.lastAction = 'chest_gun';
         io.to(roomId).emit('game_event', { type: 'duel_item', item: 'gun', from: player.id, to: opponent.id });
       } else if (item === 'health') {
-        duelRound.lives[player.id] = Math.min(3, (duelRound.lives[player.id] ?? 3) + 1);
+        duelRound.lives[player.id] = Math.min(duelRound.maxLives, (duelRound.lives[player.id] ?? DUEL_MAX_LIVES) + 1);
         player.lastAction = 'chest_health';
         io.to(roomId).emit('game_event', { type: 'duel_item', item: 'health', from: player.id });
       } else if (item === 'skip') {
         duelRound.skipNextFor = opponent.id;
         player.lastAction = 'chest_skip';
         io.to(roomId).emit('game_event', { type: 'duel_item', item: 'skip', from: player.id, to: opponent.id });
+      } else if (item === 'double_kill') {
+        duelRound.lives[opponent.id] = Math.max(0, (duelRound.lives[opponent.id] ?? DUEL_MAX_LIVES) - 2);
+        player.lastAction = 'chest_double_kill';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'double_kill', from: player.id, to: opponent.id });
+      } else if (item === 'magnifier') {
+        duelRound.peekCharges[player.id] = (duelRound.peekCharges[player.id] ?? 0) + 1;
+        player.lastAction = 'chest_magnifier';
+        io.to(roomId).emit('game_event', { type: 'duel_item', item: 'magnifier', from: player.id });
       } else {
         player.lastAction = 'chest_empty';
         io.to(roomId).emit('game_event', { type: 'duel_item', item: 'empty', from: player.id });
