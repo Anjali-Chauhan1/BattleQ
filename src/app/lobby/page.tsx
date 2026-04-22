@@ -140,6 +140,18 @@ export default function Lobby() {
                                 onClick={() => router.push("/arena?mode=solo")}
                             />
                         </motion.div>
+
+                        <motion.div variants={itemVariants}>
+                            <RoomCard
+                                title="Duel"
+                                icon={<Users className="w-10 h-10" />}
+                                entryFee={10}
+                                avgReward={20}
+                                stats="2 players, same chest grid, turn-based real-time combat."
+                                variant="pink"
+                                onClick={() => router.push("/arena?mode=duel")}
+                            />
+                        </motion.div>
                     </motion.div>
 
                     {/* Immersive Stats Bar */}
