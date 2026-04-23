@@ -3,26 +3,39 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
-const getSocketUrl = () => {
+/**
+ * Determine the Socket.IO game-server URL.
+ *
+ * On Vercel the Next.js app runs in serverless functions – there is no
+ * persistent Node process, so the Socket.IO game server MUST be deployed
+ * separately (e.g. Railway, Fly.io, Render, etc.) and the URL provided
+ * via `NEXT_PUBLIC_SOCKET_URL`.
+ *
+ * Fallback chain:
+ *   1. NEXT_PUBLIC_SOCKET_URL env var  (always preferred)
+ *   2. In development on localhost → http://127.0.0.1:3001
+ *   3. On a deployed domain without env var → null (socket disabled)
+ */
+function getSocketUrl(): string | null {
   if (process.env.NEXT_PUBLIC_SOCKET_URL) {
     return process.env.NEXT_PUBLIC_SOCKET_URL;
   }
 
   if (typeof window !== "undefined") {
-    const isProd = window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
-    // In production, if no URL provided, we assume the server is on the same host but port 3001
-    // or properly proxied. For now, defaulting to same host :3001 is a better bet than localhost.
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
+    const host = window.location.hostname;
+    const isLocalDev = host === "localhost" || host === "127.0.0.1";
 
-    // If we're on a real domain, use that domain with port 3001 as fallback
-    if (isProd) {
-      return `${protocol}//${hostname}:3001`;
+    if (isLocalDev) {
+      return "http://127.0.0.1:3001";
     }
+
+    // On a deployed domain without NEXT_PUBLIC_SOCKET_URL we
+    // gracefully disable the multiplayer socket.
+    return null;
   }
 
-  return "http://127.0.0.1:3001";
-};
+  return null;
+}
 
 const SOCKET_URL = getSocketUrl();
 
@@ -31,6 +44,16 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    // If no socket URL is available, skip connecting entirely.
+    if (!SOCKET_URL) {
+      console.warn(
+        "[BattleQ] NEXT_PUBLIC_SOCKET_URL is not set. " +
+          "Multiplayer / duel features are disabled. " +
+          "Deploy gameServer.ts separately and set the URL.",
+      );
+      return;
+    }
+
     if (!socketRef.current) {
       socketRef.current = io(SOCKET_URL, {
         transports: ["websocket", "polling"],

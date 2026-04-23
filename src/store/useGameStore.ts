@@ -23,6 +23,13 @@ export interface SoloHistory {
   date: string;
 }
 
+export interface SoloSettlement {
+  result: 'win' | 'loss';
+  stakeAmount: number;
+  payoutAmount: number;
+  createdAt: number;
+}
+
 export interface SoloGameState {
   level: number;
   unlockedLevel: number;
@@ -38,6 +45,7 @@ export interface SoloGameState {
   history: SoloHistory[];
   withdrawalUnlocked: boolean;
   stake: number;
+  pendingSettlement: SoloSettlement | null;
 }
 
 interface GameState {
@@ -57,6 +65,7 @@ interface GameState {
   clickTile: (x: number, y: number) => void;
   resetSolo: () => void;
   nextLevel: () => void;
+  clearPendingSettlement: () => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -81,6 +90,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     history: [],
     withdrawalUnlocked: false,
     stake: 50,
+    pendingSettlement: null,
   },
 
   setMatch: (id) => set({ matchId: id }),
@@ -94,6 +104,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   setSoloStatus: (status) => set((state) => ({ 
     solo: { ...state.solo, gameStatus: status } 
+  })),
+
+  clearPendingSettlement: () => set((state) => ({
+    solo: {
+      ...state.solo,
+      pendingSettlement: null,
+    }
   })),
 
   startLevel: (level) => {
@@ -165,6 +182,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         revealedTiles: new Set(),
         movesLeft: moves,
         totalMoves: moves,
+        pendingSettlement: null,
       }
     }));
   },
@@ -205,6 +223,12 @@ export const useGameStore = create<GameState>((set, get) => ({
             score: state.solo.score + winAmount,
             unlockedLevel: nextUnlockedLevel,
             withdrawalUnlocked: withdrawalUnlocked,
+            pendingSettlement: {
+              result: 'win',
+              stakeAmount,
+              payoutAmount: winAmount,
+              createdAt: Date.now(),
+            },
             history: [
               {
                 result: 'SUCCESS' as const,
@@ -227,6 +251,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           movesLeft: 0,
           gameStatus: 'lost',
           score: Math.max(0, state.solo.score - stakeAmount),
+          pendingSettlement: {
+            result: 'loss',
+            stakeAmount,
+            payoutAmount: 0,
+            createdAt: Date.now(),
+          },
           history: [
             {
               result: 'FAILED' as const,
@@ -258,6 +288,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       gameStatus: 'selecting',
       withdrawalUnlocked: false,
       stake: 50,
+      pendingSettlement: null,
     }
   })),
 

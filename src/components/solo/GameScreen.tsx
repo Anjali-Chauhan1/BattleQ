@@ -7,13 +7,46 @@ import { useGameStore } from '@/store/useGameStore';
 import { Tile } from './Tile';
 import { StatItem } from '@/components/ui/StatItem';
 import { LossStakingCard } from './LossStakingCard';
+import { useRollupSolo } from '@/hooks/useRollupSolo';
 
 export const GameScreen = () => {
-    const { solo, clickTile, setSoloStatus, startLevel, nextLevel } = useGameStore();
+    const { solo, clickTile, setSoloStatus, startLevel, nextLevel, clearPendingSettlement } = useGameStore();
+    const { settleRound, isSettlingOnChain, actionError, clearActionError, settlementTxHash } = useRollupSolo();
+    const processedSettlementsRef = React.useRef<Set<number>>(new Set());
     
     const isElite = solo.level > 3;
     const practiceStakes = [5, 10, 15];
     const currentStake = isElite ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
+
+    const processSettlement = React.useCallback(async () => {
+        const pending = solo.pendingSettlement;
+        if (!pending) return;
+
+        try {
+            await settleRound(pending.result === 'win', pending.payoutAmount);
+            clearPendingSettlement();
+        } catch {
+            // Error state is surfaced by the hook and retry action.
+        }
+    }, [clearPendingSettlement, settleRound, solo.pendingSettlement]);
+
+    React.useEffect(() => {
+        const pending = solo.pendingSettlement;
+        if (!pending) return;
+        if (processedSettlementsRef.current.has(pending.createdAt)) return;
+
+        processedSettlementsRef.current.add(pending.createdAt);
+        void processSettlement();
+    }, [processSettlement, solo.pendingSettlement]);
+
+    const retrySettlement = () => {
+        const pending = solo.pendingSettlement;
+        if (!pending) return;
+
+        processedSettlementsRef.current.delete(pending.createdAt);
+        clearActionError();
+        void processSettlement();
+    };
 
     // Win Overlay Component
     const WinOverlay = () => (
@@ -40,6 +73,22 @@ export const GameScreen = () => {
                         <span className="text-[11px] text-primary/60 font-black uppercase mt-2">
                             REWARD SCALED BY {Math.max(1, solo.revealedTiles.size)}X TILE MULTIPLIER
                         </span>
+                    )}
+                </div>
+
+                <div className="mb-8 text-left text-[10px] uppercase tracking-widest space-y-1 border border-primary/20 bg-primary/5 px-4 py-3">
+                    {isSettlingOnChain && <p className="text-primary">&gt; Syncing payout to rollup...</p>}
+                    {!isSettlingOnChain && settlementTxHash && (
+                        <p className="text-secondary">&gt; Payout tx: {`${settlementTxHash.slice(0, 10)}...${settlementTxHash.slice(-6)}`}</p>
+                    )}
+                    {actionError && <p className="text-accent">&gt; {actionError}</p>}
+                    {actionError && (
+                        <button
+                            onClick={retrySettlement}
+                            className="mt-2 border border-primary/40 text-primary px-3 py-1 text-[9px]"
+                        >
+                            RETRY_SETTLEMENT
+                        </button>
                     )}
                 </div>
                 
@@ -114,6 +163,22 @@ export const GameScreen = () => {
                     />
                 )}
             </AnimatePresence>
+
+            {solo.gameStatus === 'lost' && solo.pendingSettlement && (
+                <div className="fixed right-4 top-24 z-[550] border border-white/10 bg-black/70 backdrop-blur px-4 py-3 text-[10px] uppercase tracking-widest space-y-1">
+                    {isSettlingOnChain && <p className="text-primary">&gt; Finalizing forfeit on rollup...</p>}
+                    {!isSettlingOnChain && !actionError && <p className="text-secondary">&gt; Stake forfeiture synced.</p>}
+                    {actionError && <p className="text-accent">&gt; {actionError}</p>}
+                    {actionError && (
+                        <button
+                            onClick={retrySettlement}
+                            className="border border-primary/40 text-primary px-2 py-1 text-[9px]"
+                        >
+                            RETRY_FORFEIT_SYNC
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Tactical HUD Header */}
             <header className="h-20 z-50 w-full bg-background/90 backdrop-blur-md border-b-2 border-primary/20 sticky top-0">

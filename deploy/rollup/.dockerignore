@@ -1,0 +1,5 @@
+# Don't send unnecessary files to Docker daemon
+README.md
+prepare.sh
+.dockerignore
+*.log

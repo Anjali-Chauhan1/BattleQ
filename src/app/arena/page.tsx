@@ -12,11 +12,14 @@ import { LevelSelectionScreen } from "@/components/solo/LevelSelectionScreen";
 import { GameRulesOverlay } from "@/components/solo/GameRulesOverlay";
 import { GameScreen } from "@/components/solo/GameScreen";
 import { StakeConfirmation } from "@/components/solo/StakeConfirmation";
+import { useRollupSolo } from "@/hooks/useRollupSolo";
 
 export default function Arena() {
     const [mode, setMode] = useState("solo");
-    const { solo, setSoloStatus, startLevel, setStake } = useGameStore();
+    const { solo, setSoloStatus, setStake } = useGameStore();
     const [showTour, setShowTour] = useState(false);
+    const [stakeSyncError, setStakeSyncError] = useState<string | null>(null);
+    const { stakeRound, isStakingOnChain, actionError, clearActionError, walletBalance } = useRollupSolo();
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -41,6 +44,17 @@ export default function Arena() {
     const completeTour = () => {
         setShowTour(false);
         localStorage.setItem('battleq_tour_v2', 'true');
+    };
+
+    const confirmStake = async (currentStake: number) => {
+        try {
+            clearActionError();
+            setStakeSyncError(null);
+            await stakeRound(currentStake);
+            setSoloStatus('playing');
+        } catch (error) {
+            setStakeSyncError(error instanceof Error ? error.message : 'Failed to lock stake on rollup.');
+        }
     };
 
     // If we are in selecting OR staking mode, use the full-screen layout
@@ -84,9 +98,16 @@ export default function Arena() {
                                     level={solo.level}
                                     stakeAmount={currentStake}
                                     potentialReward={potentialReward}
-                                    onConfirm={() => setSoloStatus('playing')}
-                                    onCancel={() => setSoloStatus('selecting')}
+                                    onConfirm={() => void confirmStake(currentStake)}
+                                    onCancel={() => {
+                                        clearActionError();
+                                        setStakeSyncError(null);
+                                        setSoloStatus('selecting');
+                                    }}
                                     onStakeChange={isElite ? setStake : undefined}
+                                    isConfirming={isStakingOnChain}
+                                    errorMessage={stakeSyncError ?? actionError}
+                                    walletBalance={walletBalance ? { formatted: walletBalance.formatted, symbol: walletBalance.symbol } : null}
                                 />
                             </motion.div>
                         )}

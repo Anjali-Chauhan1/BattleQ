@@ -1,0 +1,31 @@
+{
+  "project_name": "BattleQ",
+  "track": "Gaming",
+  "description": "A cyberpunk-themed blockchain gaming platform built on Initia where players stake tokens, hunt treasures on cyber-grids, and compete in real-time duels. Features on-chain staking, payouts via house wallet, solo & multiplayer modes with AI opponents.",
+  "team": [],
+  "rollup_chain_id": "BattleQ",
+  "interwovenkit_usage": [
+    "Wallet connection via InterwovenKit (initiaPrivyWalletConnector)",
+    "Transaction handling for staking and payouts"
+  ],
+  "initia_native_features": [
+    "Auto-signing / Session UX (enableAutoSign)",
+    "Initia Usernames (.init) display via useUsernameQuery"
+  ],
+  "tech_stack": [
+    "Next.js 16",
+    "TypeScript",
+    "Wagmi + Viem",
+    "@initia/interwovenkit-react",
+    "Socket.IO (multiplayer server)",
+    "Upstash Redis (serverless state)",
+    "Framer Motion (animations)"
+  ],
+  "deployment": {
+    "frontend": "Vercel",
+    "game_server": "Separate Node.js process (Railway/Fly.io)",
+    "rollup": "Initia EVM Rollup via Weave CLI"
+  },
+  "repository": "",
+  "demo_video": ""
+}

@@ -81,7 +81,7 @@ export default function Lobby() {
                                     {guestUser}
                                 </span>
                                 <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-primary uppercase font-black tracking-widest opacity-70 font-mono">GUEST_AUTH_OK</span>
+                                    <span className="text-[10px] text-primary uppercase font-black tracking-widest opacity-70 font-mono">WALLET_AUTH_OK</span>
                                     <div className="w-2 h-2 bg-primary rounded-full animate-ping" />
                                 </div>
                             </div>

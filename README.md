@@ -1,82 +1,185 @@
-# BATTLEQ: Tactical Web3 Arena 🛡️
+# BattleQ ⚔️
 
-**BattleQ** is a high-octane tactical grid-based strategy game. Navigate through shifting sectors, manage high-stakes energy reserves, and extract rare treasures in a high-fidelity "Cyber-Cinematic" environment.
+> A cyberpunk blockchain gaming platform built on **Initia** — stake tokens, hunt treasures, and compete in real-time duels.
 
-![BattleQ Banner](https://img.shields.io/badge/BattleQ-Cyber--Tactical-00f2ff)
-![License](https://img.shields.io/badge/Status-Operational-green)
-![Tech](https://img.shields.io/badge/Built%20with-Next.js%20%7C%20Socket.io-black)
-
-## 🕹️ Core Gameplay Mechanics
-
-### 1. Solo Extraction (The Hunt)
-*   **Mission Sync**: Lock your credits before entering a sector. Stake 10 credits per level.
-*   **Tactical Grid**: Navigate a dynamic grid (`3x3` to `10x10`) to find the hidden treasure.
-*   **Energy Management**: Every scan costs charge. Run out of energy, and your stake is **liquidated**.
-*   **3D Interaction**: On-click reveals feature a 3D chest opening animation with particle bursts.
-
-### 2. High-Stakes Rewards
-*   **Yield Curve**: Successfully extracting treasures returns your stake plus a level-based bonus.
-    *   *Level 1*: Stake 10 → Yield **20**
-    *   *Level 2*: Stake 20 → Yield **35**
-*   **Liquidated Assets**: Failing a mission results in a "Disturbing" system failure screen and forfeiture of staked credits.
-
-### 3. Progressive Difficulty
-*   **Trap Detection**: Levels 2+ introduce trap tiles that drain double energy.
-*   **Fake Signals**: Multiple fake treasures appear as you advance.
-*   **Dynamic Scaling**: Grid size and scan success ratios tighten as you climb the ranks.
+![Track: Gaming](https://img.shields.io/badge/Track-Gaming-00f2ff?style=for-the-badge)
+![Built on Initia](https://img.shields.io/badge/Built%20on-Initia-5C36FF?style=for-the-badge)
+![InterwovenKit](https://img.shields.io/badge/InterwovenKit-Integrated-00ffa3?style=for-the-badge)
 
 ---
 
-## 👤 Operative Profile & Intelligence
-*   **Strategic Mission Log**: Track your last 5 operations with detailed results and rewards.
-*   **Tactical Win Ratio**: Real-time calculation of your success percentage.
-*   **Rank Progression**: Advance from **Sector Scout** to **Elite Guard** and **Centurion Prime**.
-*   **Global Score**: Persistent credit tracking with rank-based tiering.
+## 🎮 What is BattleQ?
+
+BattleQ is a high-stakes cyberpunk gaming platform deployed as an **Initia appchain (EVM rollup)**. Players connect their wallets, stake tokens, and compete in two game modes:
+
+### Solo Mode — Treasure Hunt
+- Choose a difficulty level (1-3 Practice, 4+ Elite Arena)
+- Stake tokens on-chain to the treasury
+- Navigate a cyber-grid to find hidden treasures before running out of moves
+- Win → receive multiplied payout from the house wallet
+- Lose → stake is forfeited to the treasury
+
+### Duel Mode — PvP Chest Battle
+- Create or join rooms with room codes
+- Both players bet tokens into a shared pot
+- Take turns opening chests containing weapons, health, and power-ups
+- Last player standing wins the entire pot
 
 ---
 
-## 🚀 Technical Stack
+## 🔗 Initia Integration
 
-*   **Frontend**: [Next.js 15](https://nextjs.org/) (App Router), [Tailwind CSS](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/).
-*   **State Management**: [Zustand](https://zustand-demo.pmnd.rs/) with deep mission history persistence.
-*   **Animation Engine**: Complex 3D CSS transforms and SVG-based glitch filters.
-*   **Icons**: [Lucide React](https://lucide.dev/).
-*   **Backend**: Node.js & Socket.io (for future multiplayer scalability).
+### InterwovenKit (`@initia/interwovenkit-react`)
+- **Wallet Connection**: Primary wallet connection via `InterwovenKitProvider` with `initiaPrivyWalletConnector`
+- **Transaction Handling**: All staking and payout transactions flow through the Initia rollup
+
+### Initia-Native Features
+1. **Auto-Signing / Session UX**: Enabled via `enableAutoSign={true}` — players can approve transactions without repeated wallet popups during gameplay
+2. **Initia Usernames (.init)**: Player profiles display `.init` usernames via `useUsernameQuery()` hook
+
+### Rollup Deployment
+- **VM**: EVM
+- **Chain ID**: `BattleQ`
+- **Deployed via**: Weave CLI (`weave rollup launch --vm evm`)
 
 ---
 
-## 🛠️ Setup & Operations
+## 🏗️ Architecture
 
-### 1. Intelligence Installation
-Clone the repository and install tactical dependencies:
+```
+┌─────────────────────────────────────────────────┐
+│                Browser / Player                  │
+│  MetaMask / Initia Wallet (InterwovenKit)       │
+└──────────┬──────────────────────────┬───────────┘
+           │                          │
+           ▼                          ▼
+┌──────────────────┐      ┌───────────────────────┐
+│  Next.js on      │      │  Game Server          │
+│  Vercel          │      │  (Socket.IO)          │
+│                  │      │                       │
+│  /api/auth/*     │      │  Solo rounds          │
+│  /api/rollup/*   │      │  Duel matchmaking     │
+│  (stake/payout/  │      │  AI opponents         │
+│   forfeit)       │      │  Real-time events     │
+└──────┬───────────┘      └───────────────────────┘
+       │
+       ▼
+┌──────────────────┐      ┌───────────────────────┐
+│  Initia EVM      │      │  Upstash Redis        │
+│  Rollup          │      │  (Auth + Stake State) │
+│                  │      │                       │
+│  Treasury Wallet │      │  Nonces, Sessions,    │
+│  House Wallet    │      │  Pending Stakes       │
+└──────────────────┘      └───────────────────────┘
+```
+
+---
+
+## 💰 Money Flow
+
+1. **Stake**: Player sends INIT tokens → Treasury address (`0xa0a3...E1F8`)
+2. **Play**: Game runs (solo treasure hunt or PvP duel)
+3. **Win**: House wallet sends payout (stake × multiplier) back to player
+4. **Lose**: Stake stays in treasury; pending record is cleared
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- MetaMask or Initia Wallet
+
+### Local Development
+
 ```bash
+# Install dependencies
 npm install
-```
 
-### 2. Launch Operational Console (Client)
-Start the Next.js development server:
-```bash
+# Start the Next.js app
 npm run dev
+
+# In a separate terminal, start the game server
+npm run build:server && node dist/server/gameServer.js
 ```
-Open [http://localhost:3000](http://localhost:3000) to begin your mission.
+
+### Environment Variables
+
+Copy `.env.example` to `.env.local` and configure:
+
+```bash
+cp .env.example .env.local
+```
+
+Key variables:
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_ROLLUP_JSON_RPC` | Your rollup's EVM RPC endpoint |
+| `NEXT_PUBLIC_BATTLEQ_TREASURY` | Treasury wallet address |
+| `ROLLUP_HOUSE_PRIVATE_KEY` | House wallet private key (server-side) |
+| `UPSTASH_REDIS_REST_URL` | Redis for auth state (required on Vercel) |
+| `NEXT_PUBLIC_SOCKET_URL` | Game server URL |
+
+### Deploy to Vercel
+
+```bash
+npx vercel --prod
+```
+
+Set environment variables in Vercel dashboard → Settings → Environment Variables.
 
 ---
 
-## 📂 Project Structure
+## 📁 Project Structure
 
-```text
-├── src/
-│   ├── app/            # Tactical Routes (Lobby, Arena, Profile)
-│   ├── components/     
-│   │   ├── solo/       # Mission Logic (Grid, Staking, Loss/Win Cards)
-│   │   └── ui/         # Glass-Panel Design System
-│   ├── store/          # Global Persistence & Difficulty Logic
-│   └── lib/            # User & Contract Protocols
+```
+src/
+├── app/
+│   ├── page.tsx              # Landing page
+│   ├── lobby/page.tsx        # Game mode selection
+│   ├── arena/page.tsx        # Main game (solo + duel)
+│   ├── profile/page.tsx      # Player profile + stats
+│   ├── result/page.tsx       # Game results
+│   └── api/
+│       ├── auth/             # Wallet authentication
+│       └── rollup/           # Stake, payout, forfeit
+├── components/
+│   ├── providers/Web3Provider.tsx  # InterwovenKit + Wagmi
+│   ├── shared/AuthGuard.tsx        # Wallet auth gate
+│   ├── solo/                       # Solo game components
+│   └── game/                       # Multiplayer components
+├── hooks/
+│   ├── useRollupSolo.ts     # On-chain staking hook
+│   └── useSocket.ts         # Socket.IO connection
+├── lib/rollup/
+│   ├── config.ts            # Rollup configuration
+│   ├── chain.ts             # Viem chain definition
+│   └── server/              # Server-side clients
+├── server/
+│   └── gameServer.ts        # Socket.IO game server
+└── store/
+    └── useGameStore.ts      # Zustand game state
 ```
 
 ---
 
-## ⚠️ Tactical Warning
-This is a high-stakes environment. Unauthorized disconnects or energy depletion will result in immediate asset liquidation.
+## 🛠️ Tech Stack
 
-**Status: READY FOR DEPLOYMENT.**
+| Technology | Purpose |
+|------------|---------|
+| **Next.js 16** | Frontend framework |
+| **TypeScript** | Type safety |
+| **@initia/interwovenkit-react** | Initia wallet integration |
+| **Wagmi + Viem** | EVM interactions |
+| **Socket.IO** | Real-time multiplayer |
+| **Zustand** | Client state management |
+| **Upstash Redis** | Serverless auth/stake persistence |
+| **Framer Motion** | Animations |
+| **Lucide React** | Icons |
+
+---
+
+## 📜 License
+
+MIT

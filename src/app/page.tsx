@@ -18,12 +18,6 @@ export default function Onboarding() {
   }, []);
 
   const handleJoin = () => {
-    if (typeof window !== "undefined") {
-        if (!localStorage.getItem("battleq_user")) {
-          const guestId = `guest_${Math.random().toString(36).substring(2, 8)}`;
-          localStorage.setItem("battleq_user", guestId);
-        }
-    }
     router.push("/lobby");
   };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Target, Shield, Lock, Zap, Trophy, ChevronRight, Plus, Minus } from 'lucide-react';
+import { Target, Shield, Lock, Zap, Trophy, ChevronRight, Plus, Minus, Wallet } from 'lucide-react';
 import React from 'react';
 
 interface StakeConfirmationProps {
@@ -11,6 +11,9 @@ interface StakeConfirmationProps {
     onConfirm: () => void;
     onCancel: () => void;
     onStakeChange?: (amount: number) => void;
+    isConfirming?: boolean;
+    errorMessage?: string | null;
+    walletBalance?: { formatted: string; symbol: string } | null;
 }
 
 export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({ 
@@ -19,7 +22,10 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
     potentialReward, 
     onConfirm, 
     onCancel,
-    onStakeChange
+    onStakeChange,
+    isConfirming = false,
+    errorMessage,
+    walletBalance
 }) => {
     const isElite = level > 3;
 
@@ -146,16 +152,38 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                     </div>
                 </div>
 
+                {/* Wallet Balance */}
+                {walletBalance && (
+                    <div className="flex items-center gap-3 mb-4 p-3 bg-white/5 border border-white/10">
+                        <Wallet className="w-4 h-4 text-primary" />
+                        <div className="flex-1">
+                            <span className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em] block">WALLET_BALANCE</span>
+                            <span className="text-sm font-black text-white">{Number(walletBalance.formatted).toFixed(4)} {walletBalance.symbol}</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Status Log */}
                 <div className="mb-10 font-mono space-y-1">
                     <p className="text-[9px] text-white/30 uppercase tracking-widest">&gt; INITIALIZING SECURE PROTOCOL...</p>
                     <p className="text-[9px] text-primary uppercase tracking-widest animate-pulse">&gt; READY TO LOCK ASSETS FOR {isElite ? 'ELITE ARENA' : `LEVEL ${level}`}</p>
+                    {isConfirming && (
+                        <p className="text-[9px] text-secondary uppercase tracking-widest animate-pulse">
+                            &gt; BROADCASTING STAKE TX TO ROLLUP...
+                        </p>
+                    )}
+                    {errorMessage && (
+                        <p className="text-[10px] text-accent uppercase tracking-wide">
+                            &gt; ERROR: {errorMessage}
+                        </p>
+                    )}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-4">
                     <button
                         onClick={onCancel}
+                        disabled={isConfirming}
                         className="px-6 py-4 bg-white/5 border border-white/10 text-white font-black uppercase text-xs tracking-[0.2em] hover:bg-white/10 transition-all"
                         style={{ clipPath: 'polygon(15% 0, 100% 0, 85% 100%, 0 100%)' }}
                     >
@@ -163,11 +191,12 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                     </button>
                     <button
                         onClick={onConfirm}
-                        className="flex-1 py-5 bg-primary text-black font-black uppercase text-sm tracking-[0.3em] hover:bg-white transition-all shadow-[0_0_40px_rgba(0,242,255,0.4)] group relative overflow-hidden"
+                        disabled={isConfirming}
+                        className="flex-1 py-5 bg-primary text-black font-black uppercase text-sm tracking-[0.3em] hover:bg-white transition-all shadow-[0_0_40px_rgba(0,242,255,0.4)] group relative overflow-hidden disabled:opacity-70 disabled:cursor-not-allowed"
                         style={{ clipPath: 'polygon(8% 0, 100% 0, 92% 100%, 0 100%)' }}
                     >
                         <span className="relative z-10 flex items-center justify-center gap-3">
-                            LOCK_YOUR_STAKE <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            {isConfirming ? 'LOCKING_ON_ROLLUP...' : 'LOCK_YOUR_STAKE'} <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                         </span>
                     </button>
                 </div>
