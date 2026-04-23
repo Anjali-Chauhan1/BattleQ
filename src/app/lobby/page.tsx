@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Users, User, Rocket, Shield, TrendingUp, Wallet, ChevronRight, LayoutGrid, Zap, Cpu, Globe } from "lucide-react";
 import { getGuestUser } from "@/lib/user";
@@ -19,7 +19,7 @@ export default function Lobby() {
 
     if (!mounted) return null;
 
-    const containerVariants = {
+    const containerVariants: Variants = {
         hidden: { opacity: 0 },
         visible: {
             opacity: 1,
@@ -27,9 +27,9 @@ export default function Lobby() {
         }
     };
 
-    const itemVariants = {
+    const itemVariants: Variants = {
         hidden: { opacity: 0, scale: 0.95 },
-        visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as any } }
+        visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] } }
     };
 
     return (

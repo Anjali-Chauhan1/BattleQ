@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { 
   User, Shield, TrendingUp, History, Star, ArrowLeft, 
@@ -24,7 +24,7 @@ export default function Profile() {
 
   const reputation = Math.min(Math.floor(solo.score * 0.1) + (solo.unlockedLevel * 100), 1000);
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
@@ -32,7 +32,7 @@ export default function Profile() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 10 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
   };

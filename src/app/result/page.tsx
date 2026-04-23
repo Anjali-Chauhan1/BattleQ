@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Award, Trophy, TrendingUp, RefreshCw, Rocket, Wallet, Share2, Activity } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -18,21 +18,21 @@ export default function Result() {
     setRanking(sorted);
   }, [players]);
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0, y: 50 },
     visible: { 
       opacity: 1, 
       y: 0,
       transition: { 
         duration: 0.8, 
-        ease: [0.16, 1, 0.3, 1] as any,
+        ease: [0.16, 1, 0.3, 1],
         staggerChildren: 0.1,
         delayChildren: 0.2
       }
     }
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
   };
