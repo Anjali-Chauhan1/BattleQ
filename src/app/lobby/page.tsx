@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Users, User, Rocket, Shield, TrendingUp, Wallet, ChevronRight, LayoutGrid, Zap } from "lucide-react";
+import { Users, User, Rocket, Shield, TrendingUp, Wallet, ChevronRight, LayoutGrid, Zap, Cpu, Globe } from "lucide-react";
 import { getGuestUser } from "@/lib/user";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { RoomCard } from "@/components/lobby/RoomCard";
@@ -38,13 +38,26 @@ export default function Lobby() {
                 {/* Scanline Effect */}
                 <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[100] bg-[length:100%_2px,3px_100%]" />
                 
-                <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-primary/10 via-transparent to-transparent pointer-events-none" />
+                {/* Dynamic Background Glows */}
+                <div className="absolute top-0 left-1/4 w-[800px] h-[800px] bg-primary/10 blur-[180px] rounded-full animate-aurora pointer-events-none" />
+                <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-secondary/5 blur-[150px] rounded-full animate-aurora pointer-events-none [animation-delay:4s]" />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(0,242,255,0.03)_0%,transparent_70%)] pointer-events-none" />
+
+                {/* Decorative Orbital Grid */}
+                <div className="absolute top-20 right-[-10%] w-[500px] h-[500px] border border-primary/10 rounded-full animate-[spin_60s_linear_infinite] pointer-events-none">
+                    <div className="absolute top-1/2 left-0 w-2 h-2 bg-primary rounded-full -translate-x-1/2 shadow-[0_0_10px_var(--primary)]" />
+                </div>
+                <div className="absolute bottom-20 left-[-10%] w-[400px] h-[400px] border border-secondary/10 rounded-full animate-[spin_40s_linear_infinite_reverse] pointer-events-none">
+                    <div className="absolute top-0 left-1/2 w-2 h-2 bg-secondary rounded-full -translate-y-1/2 shadow-[0_0_10px_var(--secondary)]" />
+                </div>
+
+                <div className="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
 
                 <div className="relative z-10 w-full max-w-7xl px-8 py-10 flex flex-col gap-12">
 
                     {/* Premium Navigation Header */}
                     <header className="flex justify-between items-center bg-background/80 p-6 border-2 border-primary/20 backdrop-blur-xl group transition-all duration-500 hover:border-primary/40"
-                            style={{ clipPath: 'polygon(0 0, 98% 0, 100% 15%, 100% 100%, 2% 100%, 0 85%)' }}>
+                        style={{ clipPath: 'polygon(0 0, 98% 0, 100% 15%, 100% 100%, 2% 100%, 0 85%)' }}>
                         <div className="flex items-center gap-8">
                             <motion.div
                                 whileHover={{ rotate: 90, scale: 1.1 }}
@@ -94,32 +107,27 @@ export default function Lobby() {
                         animate={{ opacity: 1, y: 0 }}
                         className="flex flex-col md:flex-row md:items-end justify-between gap-8 py-5 border-l-4 border-primary/50 pl-8 bg-gradient-to-r from-primary/5 to-transparent"
                     >
-                        <div className="space-y-4 max-w-2xl">
+                        <div className="space-y-6 max-w-3xl relative z-10">
                             <div className="flex items-center gap-3">
-                                <span className="text-[11px] font-black text-primary uppercase tracking-[.4em] font-mono animate-pulse">SCANNING_AVAILABLE_SECTORS...</span>
+                                <motion.span 
+                                    animate={{ opacity: [0.4, 1, 0.4] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                    className="text-[11px] font-black text-primary uppercase tracking-[.4em] font-mono"
+                                >
+                                    SCANNING_AVAILABLE_SECTORS...
+                                </motion.span>
                                 <div className="h-[1px] w-24 bg-primary/30" />
                             </div>
-                            <h3 className="text-6xl md:text-7xl font-black italic tracking-tighter uppercase leading-[0.95]">
+                            <h3 className="text-6xl md:text-8xl font-black italic tracking-tighter uppercase leading-[0.9]">
                                 Engage Your Next <br />
                                 <span className="neon-text-blue drop-shadow-[0_0_20px_rgba(0,242,255,0.4)]">Tactical Phase</span>
                             </h3>
-                            <p className="text-gray-400 text-lg md:text-xl font-medium max-w-xl italic leading-relaxed">
+                            <p className="text-gray-400 text-lg md:text-xl font-medium max-w-xl italic leading-relaxed font-sans">
                                 Stake your reputation, form alliances, and out-maneuver your opponents.
                                 The behavior-engine adapts with every decision you make.
                             </p>
                         </div>
 
-                        <div className="hidden lg:flex items-center gap-12 glass-panel p-8 pr-12 border-white/5 bg-white/1 min-w-[300px]">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 flex items-center justify-center bg-primary/10 border border-primary/20 rounded-2xl">
-                                    <Zap className="w-7 h-7 text-primary" />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-2xl font-black italic tracking-tight uppercase leading-none">1.4k</span>
-                                    <span className="text-[10px] text-gray-500 font-black tracking-widest uppercase">Global Activity</span>
-                                </div>
-                            </div>
-                        </div>
                     </motion.div>
 
                     {/* Arena Grid */}
@@ -154,55 +162,6 @@ export default function Lobby() {
                         </motion.div>
                     </motion.div>
 
-                    {/* Immersive Stats Bar */}
-                    <motion.footer
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-8 glass-panel p-10 flex flex-col md:flex-row items-center justify-between gap-10 border-white/5 bg-mesh-gradient opacity-80 overflow-hidden relative"
-                    >
-                        {/* Decorative mesh back in footer */}
-                        <div className="absolute inset-0 bg-primary/5 blur-3xl rounded-full translate-y-1/2" />
-
-                        <div className="flex items-center gap-8 relative z-10">
-                            <div className="w-20 h-20 rounded-3xl bg-secondary/10 border border-secondary/20 flex items-center justify-center shadow-[0_0_40px_rgba(189,0,255,0.1)]">
-                                <Shield className="w-10 h-10 text-secondary" />
-                            </div>
-                            <div className="space-y-1">
-                                <h4 className="text-[10px] text-secondary font-black uppercase tracking-[0.4em]">Combat Profile</h4>
-                                <p className="text-3xl font-black italic uppercase tracking-tighter text-white">Strategist Grade-A</p>
-                                <div className="flex items-center gap-3">
-                                    <div className="h-1 w-32 bg-white/5 rounded-full overflow-hidden">
-                                        <motion.div
-                                            initial={{ width: 0 }}
-                                            animate={{ width: "75%" }}
-                                            transition={{ duration: 1.5, delay: 0.5 }}
-                                            className="h-full bg-secondary shadow-[0_0_10px_rgba(189,0,255,0.7)]"
-                                        />
-                                    </div>
-                                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">75% to Grade-S</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-16 relative z-10 pr-6">
-                            <div className="text-center md:text-right">
-                                <span className="text-4xl font-black italic tracking-tighter text-white block">92.4 <span className="text-sm font-medium opacity-40 uppercase">PTS</span></span>
-                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-[.25em] flex items-center justify-end gap-2 mt-1">
-                                    <TrendingUp className="w-3 h-3 text-secondary" /> Earn Rate +12%
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    className="px-8 py-3 bg-white text-black font-black uppercase text-xs italic tracking-widest rounded-lg"
-                                >
-                                    History Logs
-                                </motion.button>
-                                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest mr-1 mt-1">Updated 2m ago</span>
-                            </div>
-                        </div>
-                    </motion.footer>
                 </div>
 
                 {/* Subtle decorative grid floor */}

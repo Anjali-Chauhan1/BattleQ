@@ -2,13 +2,20 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Shield, Target, Zap, Swords, ChevronRight, Globe, TrendingUp } from "lucide-react";
+import { 
+  Shield, Target, Zap, Swords, ChevronRight, Globe, TrendingUp, 
+  Terminal, Activity, Cpu, Fingerprint, Lock, Radio
+} from "lucide-react";
 import { FeatureCard } from "@/components/ui/FeatureCard";
 import { useState, useEffect } from "react";
 
 export default function Onboarding() {
   const router = useRouter();
-  const [isHovered, setIsHovered] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleJoin = () => {
     if (typeof window !== "undefined") {
@@ -20,142 +27,181 @@ export default function Onboarding() {
     router.push("/lobby");
   };
 
+  if (!mounted) return null;
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
-      transition: { staggerChildren: 0.2, delayChildren: 0.3 }
+      transition: { staggerChildren: 0.1, delayChildren: 0.1 }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as any } }
+    hidden: { opacity: 0, y: 15 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as any } }
   };
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#020203] text-white font-mono cyber-grid">
-      {/* Scanline Effect */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.08] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[100] bg-[length:100%_2px,3px_100%]" />
+    <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#020203] text-white font-mono cyber-grid py-12">
+      {/* Background Atmosphere */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-[100] bg-[length:100%_2px,3px_100%]" />
       
-      {/* Aurora Glow effects */}
-      <div className="absolute top-1/4 -right-1/4 w-[800px] h-[800px] bg-primary/10 blur-[180px] rounded-full animate-pulse" />
-      <div className="absolute bottom-1/4 -left-1/4 w-[800px] h-[800px] bg-accent/10 blur-[180px] rounded-full animate-pulse [animation-delay:2s]" />
+      {/* Dynamic Aurora Glows (No Text Glow) */}
+      <div className="absolute top-[-5%] left-[-5%] w-[1200px] h-[1200px] bg-primary/20 blur-[250px] rounded-full animate-aurora pointer-events-none opacity-60" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[1000px] h-[1000px] bg-secondary/10 blur-[200px] rounded-full animate-aurora pointer-events-none [animation-delay:6s] opacity-40" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(0,242,255,0.05)_0%,transparent_70%)] pointer-events-none" />
+      
+      {/* Decorative Rings */}
+      <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] border border-primary/5 rounded-full animate-[spin_180s_linear_infinite] pointer-events-none" />
+      <div className="absolute bottom-[-15%] left-[-10%] w-[500px] h-[500px] border border-secondary/5 rounded-full animate-[spin_150s_linear_infinite_reverse] pointer-events-none" />
 
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="relative z-10 w-full max-w-7xl mx-auto px-6 py-20 flex flex-col items-center gap-16"
+        className="relative z-10 w-full max-w-7xl mx-auto px-6 flex flex-col items-center gap-8"
       >
-        {/* Subheader Badge */}
-        <motion.div variants={itemVariants} 
-                   className="flex items-center gap-4 bg-background border-2 border-primary/30 px-6 py-2 shadow-[0_0_15px_rgba(0,242,255,0.1)]"
-                   style={{ clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0 100%)' }}>
-            <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-            </span>
-            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-primary underline decoration-primary/30 underline-offset-4">ARENA_STATUS: LIVE</span>
-            <div className="h-4 w-[1px] bg-primary/20 mx-2" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
-                <Globe className="w-3.5 h-3.5 text-primary" /> 1,248_UPLINKS
-            </span>
+        {/* Top Status Bar */}
+        <motion.div variants={itemVariants} className="w-full flex justify-between items-center glass-panel px-6 py-2 border-white/5 bg-white/[0.01]">
+            <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_var(--primary)]" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-primary">System_Online</span>
+                </div>
+                <div className="h-3 w-[1px] bg-white/10" />
+                <div className="flex items-center gap-2">
+                    <Radio className="w-2.5 h-2.5 text-gray-600" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-500">Node: SECTOR_Q-CORE</span>
+                </div>
+            </div>
+            <div className="flex items-center gap-4 text-[9px] font-black text-gray-600 uppercase tracking-widest">
+                <span>Latency: 22ms</span>
+                <span>Uplinks: 1,402</span>
+            </div>
         </motion.div>
 
-        {/* Main Logo & Headline */}
-        <div className="flex flex-col items-center gap-6 text-center">
+        {/* Hero Section (Compact) */}
+        <div className="flex flex-col items-center gap-6 text-center relative">
+            {/* Logo Emblem */}
             <motion.div
                 variants={itemVariants}
-                animate={{ scale: [1, 1.05, 1], rotate: [0, 5, 0, -5, 0] }}
-                transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-                className="w-28 h-28 bg-background border-2 border-primary flex items-center justify-center p-6 shadow-[0_0_40px_rgba(0,242,255,0.2)]"
-                style={{ clipPath: 'polygon(20% 0, 100% 0, 100% 100%, 0 100%, 0 20%)' }}
+                className="relative"
             >
-                <Swords className="w-full h-full text-primary neon-text" />
+                <div className="absolute inset-[-15px] border border-primary/10 rounded-full animate-[spin_25s_linear_infinite]" style={{ borderStyle: 'dashed' }} />
+                <div className="w-24 h-24 bg-background border-2 border-primary flex items-center justify-center p-6 relative z-10"
+                     style={{ clipPath: 'polygon(20% 0, 100% 0, 100% 100%, 0 100%, 0 20%)' }}>
+                    <Swords className="w-full h-full text-primary" />
+                </div>
             </motion.div>
 
-            <motion.h1 
-                variants={itemVariants}
-                className="text-8xl md:text-[10rem] font-black tracking-tighter uppercase italic leading-none text-white neon-text"
-            >
-                BATTLE<span className="text-primary italic">Q</span>
-            </motion.h1>
+            <div className="space-y-1">
+                <motion.h1 
+                    variants={itemVariants}
+                    className="text-7xl md:text-[9rem] font-black tracking-tighter uppercase italic leading-none text-white drop-shadow-[0_0_15px_rgba(0,242,255,0.4)]"
+                >
+                    BATTLE<span className="text-primary">Q</span>
+                </motion.h1>
+                <motion.div variants={itemVariants} className="flex items-center justify-center gap-4 opacity-20">
+                    <div className="h-[1px] w-10 bg-white" />
+                    <span className="text-[8px] font-black tracking-[0.8em] uppercase">Tactical Arena Network</span>
+                    <div className="h-[1px] w-10 bg-white" />
+                </motion.div>
+            </div>
 
             <motion.p 
                 variants={itemVariants}
-                className="text-lg md:text-2xl text-gray-400 max-w-3xl font-medium tracking-tight leading-relaxed font-mono"
+                className="text-base md:text-lg text-gray-500 max-w-xl font-medium tracking-tight leading-relaxed font-mono"
             >
-                &gt; INITIALIZING_BEHAVIOR_PROTOCOL...<br/>
-                <span className="text-white bg-primary/10 px-2 border-l-2 border-primary">ADAPT. ALLIANCE. BETRAY. EARN.</span>
+                &gt; INITIALIZING_OPERATIVE_LINK...<br/>
+                <span className="text-white bg-white/5 px-3 py-0.5 border-l-2 border-primary inline-block mt-1 uppercase text-xs tracking-widest">
+                    Strategize. Stake. Survive.
+                </span>
             </motion.p>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Center (Pulled Higher) */}
         <motion.div variants={itemVariants} className="flex flex-col items-center gap-8 w-full">
-            <motion.button
-                onHoverStart={() => setIsHovered(true)}
-                onHoverEnd={() => setIsHovered(false)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleJoin}
-                className="group relative px-12 py-6 bg-primary text-black font-black italic uppercase text-2xl tracking-[0.2em] transition-all hover:shadow-[0_0_50px_rgba(0,242,255,0.6)]"
-                style={{ clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0 100%)' }}
-            >
-                <div className="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500" />
-                <span className="relative flex items-center gap-4">
-                   ENTER_ARENA <ChevronRight className="w-8 h-8 group-hover:translate-x-2 transition-transform" />
-                </span>
-            </motion.button>
+            <div className="relative group">
+                <div className="absolute -inset-4 border border-primary/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleJoin}
+                    className="relative px-12 py-5 bg-primary text-black font-black italic uppercase text-2xl tracking-[0.3em] transition-all overflow-hidden"
+                    style={{ clipPath: 'polygon(5% 0, 100% 0, 95% 100%, 0 100%)' }}
+                >
+                    <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
+                    <span className="relative z-10 flex items-center gap-3">
+                       INITIATE <ChevronRight className="w-8 h-8 group-hover:translate-x-1 transition-transform" />
+                    </span>
+                </motion.button>
+            </div>
             
-            <motion.div className="flex gap-12 text-center opacity-40">
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Security</span>
-                    <span className="text-xs font-bold font-sans">Level-A7 Encrypt</span>
+            {/* System Specs */}
+            <div className="grid grid-cols-4 gap-12 opacity-30">
+                <div className="flex flex-col items-center gap-0.5">
+                    <Fingerprint className="w-4 h-4 mb-0.5" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-primary">Biometric</span>
+                    <span className="text-[7px] font-bold">SECURED</span>
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-secondary">Trust Engine</span>
-                    <span className="text-xs font-bold font-sans">Pact-Sync Active</span>
+                <div className="flex flex-col items-center gap-0.5">
+                    <Shield className="w-4 h-4 mb-0.5" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-secondary">Trust-B</span>
+                    <span className="text-[7px] font-bold">ACTIVE</span>
                 </div>
-            </motion.div>
+                <div className="flex flex-col items-center gap-0.5">
+                    <Lock className="w-4 h-4 mb-0.5" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-accent">Vault</span>
+                    <span className="text-[7px] font-bold">LOCKED</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                    <Activity className="w-4 h-4 mb-0.5" />
+                    <span className="text-[8px] font-black uppercase tracking-widest text-primary">Pulse</span>
+                    <span className="text-[7px] font-bold">STABLE</span>
+                </div>
+            </div>
         </motion.div>
 
-        {/* Grid Features */}
+        {/* Feature Highlights */}
         <motion.div 
             variants={itemVariants}
-            className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-8"
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl"
         >
           <FeatureCard 
-            icon={<Target className="w-8 h-8 text-primary" />}
-            title="Sovereign AI"
-            desc="Opponents adapt to your gameplay style in real-time, forcing constant evolution."
+            icon={<Target className="w-7 h-7 text-primary" />}
+            title="Sovereign Engine"
+            desc="Master the predictive behavior patterns of Solo Sectors. Clear high-density grids to harvest initial BQT reserves."
           />
           <FeatureCard 
-            icon={<TrendingUp className="w-8 h-8 text-secondary" />}
-            title="Yield Stakes"
-            desc="Earn INIT points by capturing strategic zones and maintaining tactical dominance."
+            icon={<Swords className="w-7 h-7 text-secondary" />}
+            title="Tactical Duels"
+            desc="Challenge rival operatives in real-time 1v1 combat. Your shared-grid maneuvers dictate the final system outcome."
           />
           <FeatureCard 
-            icon={<Shield className="w-8 h-8 text-accent" />}
-            title="Honor Bound"
-            desc="Your Trust score determines your matchmaking rank. Loyalty pays in BATTLEQ."
+            icon={<Shield className="w-7 h-7 text-accent" />}
+            title="Honor Protocol"
+            desc="Your Operative Tier determines your global standing. Advance to Elite rank to unlock maximum system clearance."
           />
         </motion.div>
 
-        {/* Footer Credit */}
-        <motion.div variants={itemVariants} className="mt-6 flex flex-col items-center gap-2 opacity-30">
-            <span className="text-[8px] font-black uppercase tracking-[0.5em]">System Core v2.4.9</span>
+        {/* Bottom Technical Readout */}
+        <motion.div variants={itemVariants} className="mt-2 flex flex-col items-center gap-2 opacity-20">
+            <div className="flex items-center gap-6">
+                <span className="text-[8px] font-black uppercase tracking-[0.5em]">Auth: GUEST_MODE</span>
+                <span className="text-[8px] font-black uppercase tracking-[0.5em]">Ver: 2.5.0_ALPHA</span>
+            </div>
             <div className="flex items-center gap-4">
-                <div className="w-12 h-[1px] bg-white/20" />
-                <div className="w-2 h-2 rotate-45 border border-white" />
-                <div className="w-12 h-[1px] bg-white/20" />
+                <div className="w-16 h-[1px] bg-gradient-to-r from-transparent to-white/20" />
+                <Terminal className="w-2.5 h-2.5" />
+                <div className="w-16 h-[1px] bg-gradient-to-l from-transparent to-white/20" />
             </div>
         </motion.div>
       </motion.div>
 
-      {/* Cinematic Overlays */}
-      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/80 to-transparent pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+      {/* Atmospheric Overlays */}
+      <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
       <div className="scanline" />
     </main>
   );
