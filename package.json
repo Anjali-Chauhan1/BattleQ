@@ -9,9 +9,10 @@
     "build": "next build",
     "build:server": "tsc -p tsconfig.server.json",
     "build:all": "npm run build && npm run build:server",
-    "start": "next start -p 3000",
+    "start": "concurrently \"npm run start:next\" \"npm run start:server\"",
+    "start:next": "next start -p 3000",
     "start:server": "node dist/server/gameServer.js",
-    "start:all": "concurrently \"npm run start\" \"npm run start:server\"",
+    "start:all": "npm run start",
     "lint": "next lint"
   },
   "dependencies": {
