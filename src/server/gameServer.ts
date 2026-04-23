@@ -16,8 +16,11 @@ const io = new Server(httpServer, {
 
 const PORT = 3001;
 const DUEL_GRID_SIZE = 6;
-const DUEL_BET_AMOUNT = 10;
+const DUEL_BET_AMOUNT = 50;
 const DUEL_MAX_LIVES = 5;
+const DUEL_ROOM_CODE_LENGTH = 6;
+const DUEL_BET_MIN = 50;
+const DUEL_BET_MAX = 200;
 
 type ChestItem = 'gun' | 'health' | 'skip' | 'double_kill' | 'magnifier' | 'empty';
 
@@ -57,6 +60,9 @@ const rooms: Record<string, {
   time: number;
   difficulty: number;
   mode: string;
+  isPrivate?: boolean;
+  roomCode?: string;
+  duelBetAmount?: number;
   soloRound?: {
     winX: number;
     winY: number;
@@ -66,6 +72,59 @@ const rooms: Record<string, {
   };
   duelRound?: DuelRoundState;
 }> = {};
+
+const duelRoomCodeToRoomId: Record<string, string> = {};
+
+function normalizeRoomCode(code: string) {
+  return (code || '').trim().toUpperCase();
+}
+
+function generateDuelRoomCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  for (let attempt = 0; attempt < 25; attempt++) {
+    let code = '';
+    for (let i = 0; i < DUEL_ROOM_CODE_LENGTH; i++) {
+      code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    }
+    if (!duelRoomCodeToRoomId[code]) return code;
+  }
+  return normalizeRoomCode(Math.random().toString(36).slice(2, 2 + DUEL_ROOM_CODE_LENGTH));
+}
+
+function normalizeDuelBetAmount(input: unknown) {
+  const parsed = typeof input === 'number' ? input : Number(input);
+  const asInt = Number.isFinite(parsed) ? Math.floor(parsed) : DUEL_BET_MIN;
+  return Math.min(DUEL_BET_MAX, Math.max(DUEL_BET_MIN, asInt));
+}
+
+function createPlayer(socket: Socket, data: { name: string; role: string; level?: number }) {
+  const player: PlayerState = {
+    id: socket.id,
+    name: data.name || `Hero_${socket.id.slice(0, 4)}`,
+    x: Math.floor(Math.random() * 15),
+    y: Math.floor(Math.random() * 15),
+    hp: 100,
+    maxHp: 100,
+    role: (data.role as any) || 'attacker',
+    isBot: false,
+    score: 0,
+    reputation: 100,
+    lastAction: 'joined',
+    level: data.level || 1,
+    wins: 0
+  };
+  return player;
+}
+
+function emitPlayerJoined(roomId: string) {
+  const room = rooms[roomId];
+  if (!room) return;
+  io.to(roomId).emit('player_joined', {
+    players: room.players,
+    roomId,
+    roomCode: room.roomCode,
+  });
+}
 
 function getDuelPlayers(roomId: string): PlayerState[] {
   const room = rooms[roomId];
@@ -162,8 +221,8 @@ function initializeDuelRound(roomId: string) {
     },
     skipNextFor: null,
     winnerId: null,
-    betAmount: DUEL_BET_AMOUNT,
-    totalPot: DUEL_BET_AMOUNT * duelPlayers.length,
+    betAmount: room.duelBetAmount ?? DUEL_BET_AMOUNT,
+    totalPot: (room.duelBetAmount ?? DUEL_BET_AMOUNT) * duelPlayers.length,
   };
 
   io.to(roomId).emit('game_event', {
@@ -263,12 +322,125 @@ function startSoloRound(roomId: string) {
 io.on('connection', (socket: Socket) => {
   console.log('User connected:', socket.id);
 
+  socket.on('duel_join_random', (data: { name: string; role: string; level?: number; betAmount?: number }, ack?: (res: { ok: true; roomId: string } | { ok: false; message: string }) => void) => {
+    const gameMode = 'duel';
+    const desiredBet = normalizeDuelBetAmount(data.betAmount);
+    let roomId = Object.keys(rooms).find(r =>
+      Object.keys(rooms[r].players).length < 2 &&
+      rooms[r].status === 'waiting' &&
+      rooms[r].mode === gameMode &&
+      !rooms[r].isPrivate &&
+      (rooms[r].duelBetAmount ?? desiredBet) === desiredBet
+    );
+
+    if (!roomId) {
+      roomId = `room_${gameMode}_${Date.now()}`;
+      rooms[roomId] = {
+        players: {},
+        status: 'waiting',
+        time: 300,
+        difficulty: (data.level || 1) > 10 ? 2 : 1,
+        mode: gameMode,
+        isPrivate: false,
+        duelBetAmount: desiredBet,
+      };
+    }
+
+    if (!rooms[roomId].duelBetAmount) {
+      rooms[roomId].duelBetAmount = desiredBet;
+    }
+
+    const player = createPlayer(socket, data);
+    rooms[roomId].players[socket.id] = player;
+    socket.join(roomId);
+    emitPlayerJoined(roomId);
+
+    ack?.({ ok: true, roomId });
+
+    if (Object.keys(rooms[roomId].players).length === 2) {
+      startMatch(roomId);
+    }
+  });
+
+  socket.on('duel_create_room', (data: { name: string; role: string; level?: number; betAmount?: number }, ack?: (res: { ok: true; roomId: string; roomCode: string } | { ok: false; message: string }) => void) => {
+    const roomCode = generateDuelRoomCode();
+    const roomId = `duel_${roomCode}`;
+    const desiredBet = normalizeDuelBetAmount(data.betAmount);
+
+    rooms[roomId] = {
+      players: {},
+      status: 'waiting',
+      time: 300,
+      difficulty: (data.level || 1) > 10 ? 2 : 1,
+      mode: 'duel',
+      isPrivate: true,
+      roomCode,
+      duelBetAmount: desiredBet,
+    };
+    duelRoomCodeToRoomId[roomCode] = roomId;
+
+    const player = createPlayer(socket, data);
+    rooms[roomId].players[socket.id] = player;
+    socket.join(roomId);
+
+    socket.emit('duel_room_created', { roomId, roomCode });
+    emitPlayerJoined(roomId);
+
+    ack?.({ ok: true, roomId, roomCode });
+  });
+
+  socket.on('duel_join_room', (data: { roomCode: string; name: string; role: string; level?: number; betAmount?: number }, ack?: (res: { ok: true; roomId: string; roomCode?: string } | { ok: false; message: string }) => void) => {
+    const code = normalizeRoomCode(data.roomCode);
+    const roomId = duelRoomCodeToRoomId[code] || `duel_${code}`;
+    const room = rooms[roomId];
+    const desiredBet = normalizeDuelBetAmount(data.betAmount);
+
+    if (!room || room.mode !== 'duel') {
+      socket.emit('duel_join_error', { message: 'Invalid room code' });
+      ack?.({ ok: false, message: 'Invalid room code' });
+      return;
+    }
+    if (room.status !== 'waiting') {
+      socket.emit('duel_join_error', { message: 'Match already started' });
+      ack?.({ ok: false, message: 'Match already started' });
+      return;
+    }
+    if (Object.keys(room.players).length >= 2) {
+      socket.emit('duel_join_error', { message: 'Room is full' });
+      ack?.({ ok: false, message: 'Room is full' });
+      return;
+    }
+
+    if (room.duelBetAmount && room.duelBetAmount !== desiredBet) {
+      const msg = `Stake mismatch. Room stake is ${room.duelBetAmount}.`;
+      socket.emit('duel_join_error', { message: msg });
+      ack?.({ ok: false, message: msg });
+      return;
+    }
+
+    if (!room.duelBetAmount) {
+      room.duelBetAmount = desiredBet;
+    }
+
+    const player = createPlayer(socket, data);
+    room.players[socket.id] = player;
+    socket.join(roomId);
+    emitPlayerJoined(roomId);
+
+    ack?.({ ok: true, roomId, roomCode: room.roomCode });
+
+    if (Object.keys(room.players).length === 2) {
+      startMatch(roomId);
+    }
+  });
+
   socket.on('join_match', (data: { name: string; role: string; level?: number; mode?: string }) => {
     const gameMode = data.mode || 'solo';
     let roomId = Object.keys(rooms).find(r => 
         Object.keys(rooms[r].players).length < (gameMode === 'duel' ? 2 : 6) && 
         rooms[r].status === 'waiting' &&
-        rooms[r].mode === gameMode
+        rooms[r].mode === gameMode &&
+        (gameMode !== 'duel' || !rooms[r].isPrivate)
     );
     
     if (!roomId) {
@@ -282,26 +454,12 @@ io.on('connection', (socket: Socket) => {
       };
     }
 
-    const player: PlayerState = {
-      id: socket.id,
-      name: data.name || `Hero_${socket.id.slice(0, 4)}`,
-      x: Math.floor(Math.random() * 15),
-      y: Math.floor(Math.random() * 15),
-      hp: 100,
-      maxHp: 100,
-      role: (data.role as any) || 'attacker',
-      isBot: false,
-      score: 0,
-      reputation: 100,
-      lastAction: 'joined',
-      level: data.level || 1,
-      wins: 0
-    };
+    const player = createPlayer(socket, data);
 
     rooms[roomId].players[socket.id] = player;
     socket.join(roomId);
     
-    io.to(roomId).emit('player_joined', { players: rooms[roomId].players, roomId });
+    emitPlayerJoined(roomId);
 
     if (rooms[roomId].mode === 'solo') {
       startMatch(roomId);
@@ -503,6 +661,15 @@ io.on('connection', (socket: Socket) => {
       if (rooms[roomId].players[socket.id]) {
         delete rooms[roomId].players[socket.id];
 
+        if (rooms[roomId].mode === 'duel' && Object.keys(rooms[roomId].players).length === 0) {
+          const code = rooms[roomId].roomCode;
+          if (code && duelRoomCodeToRoomId[code] === roomId) {
+            delete duelRoomCodeToRoomId[code];
+          }
+          delete rooms[roomId];
+          continue;
+        }
+
         if (rooms[roomId].mode === 'duel' && rooms[roomId].duelRound && rooms[roomId].status === 'playing') {
           const remaining = getDuelPlayers(roomId);
           if (remaining.length === 1) {
@@ -519,7 +686,7 @@ io.on('connection', (socket: Socket) => {
           emitDuelState(roomId);
         }
 
-        io.to(roomId).emit('player_left', { players: rooms[roomId].players });
+        io.to(roomId).emit('player_left', { players: rooms[roomId].players, roomId, roomCode: rooms[roomId].roomCode });
       }
     }
   });
