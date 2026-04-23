@@ -327,7 +327,7 @@ export function TutorialTour({ onComplete, steps: stepsProp }: TutorialTourProps
             return { top, left, overlapArea: currentOverlap() };
         };
 
-        const candidates: TourStep['position'][] = [step.position, 'top', 'bottom', 'right', 'left'].filter(
+        const candidates: TourStep['position'][] = ([step.position, 'top', 'bottom', 'right', 'left'] as TourStep['position'][]).filter(
             (p, idx, arr) => p !== 'center' && arr.indexOf(p) === idx
         );
 
@@ -415,7 +415,7 @@ export function TutorialTour({ onComplete, steps: stepsProp }: TutorialTourProps
                 >
                     {/* Inner Glow */}
                     <div className="absolute -inset-[1px] bg-gradient-to-br from-primary/30 via-transparent to-secondary/30 rounded-2xl -z-10 blur-[1px]" />
-                    
+
                     <div className="flex items-center gap-3 mb-4">
                         <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-primary shadow-inner">
                             {step.icon}
@@ -429,22 +429,22 @@ export function TutorialTour({ onComplete, steps: stepsProp }: TutorialTourProps
 
                     <div className="flex items-center justify-between pt-4 border-t border-white/5">
                         <div className="flex items-center gap-3">
-                             {currentStep > 0 && (
-                                <button 
+                            {currentStep > 0 && (
+                                <button
                                     onClick={handlePrev}
                                     className="p-2 rounded-xl bg-white/5 border border-white/10 text-gray-500 hover:text-white transition-all hover:bg-white/10"
                                 >
                                     <ChevronLeft className="w-4 h-4" />
                                 </button>
-                             )}
-                             <button
+                            )}
+                            <button
                                 onClick={onComplete}
                                 className="px-3 py-2 text-[10px] font-black text-gray-400 hover:text-primary uppercase tracking-[0.2em] transition-all italic"
-                             >
+                            >
                                 Skip
-                             </button>
+                            </button>
                         </div>
-                        
+
                         <div className="flex items-center gap-4">
                             <span className="text-[9px] font-black text-gray-600 tracking-[0.3em] uppercase">
                                 {currentStep + 1} / {stepsList.length}
@@ -460,13 +460,12 @@ export function TutorialTour({ onComplete, steps: stepsProp }: TutorialTourProps
                     </div>
                     {/* Arrow (only if pointing to something) */}
                     {step.targetId && tooltipPlacement.placement !== 'center' && (
-                        <div 
-                            className={`absolute w-3 h-3 bg-black border-white/10 rotate-45 z-[-1] pointer-events-none ${
-                                tooltipPlacement.placement === 'top' ? 'bottom-[-7px] left-1/2 -translate-x-1/2 border-b border-r' :
-                                tooltipPlacement.placement === 'bottom' ? 'top-[-7px] left-1/2 -translate-x-1/2 border-t border-l' :
-                                tooltipPlacement.placement === 'left' ? 'right-[-7px] top-1/2 -translate-y-1/2 border-t border-r' :
-                                'left-[-7px] top-1/2 -translate-y-1/2 border-b border-l'
-                            }`}
+                        <div
+                            className={`absolute w-3 h-3 bg-black border-white/10 rotate-45 z-[-1] pointer-events-none ${tooltipPlacement.placement === 'top' ? 'bottom-[-7px] left-1/2 -translate-x-1/2 border-b border-r' :
+                                    tooltipPlacement.placement === 'bottom' ? 'top-[-7px] left-1/2 -translate-x-1/2 border-t border-l' :
+                                        tooltipPlacement.placement === 'left' ? 'right-[-7px] top-1/2 -translate-y-1/2 border-t border-r' :
+                                            'left-[-7px] top-1/2 -translate-y-1/2 border-b border-l'
+                                }`}
                         />
                     )}
                 </motion.div>
