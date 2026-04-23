@@ -3,18 +3,53 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 
+function parseAllowedOrigins(raw: string | undefined): string | string[] {
+  if (!raw) return '*';
+
+  const trimmed = raw.trim();
+  if (!trimmed) return '*';
+  if (trimmed === '*') return '*';
+
+  const parts = trimmed
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  return parts.length <= 1 ? (parts[0] || '*') : parts;
+}
+
 const app = express();
-app.use(cors());
+
+const PORT = Number(process.env.PORT ?? process.env.SOCKET_PORT ?? 3001);
+const ALLOWED_ORIGINS = parseAllowedOrigins(
+  process.env.SOCKET_CORS_ORIGIN ?? process.env.CORS_ORIGIN
+);
+
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+  })
+);
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: ALLOWED_ORIGINS,
     methods: ['GET', 'POST'],
   },
 });
 
-const PORT = 3001;
+io.engine.on('connection_error', (err) => {
+  console.warn('Socket.IO connection error', {
+    code: err.code,
+    message: err.message,
+  });
+});
 const DUEL_GRID_SIZE = 6;
 const DUEL_BET_AMOUNT = 50;
 const DUEL_MAX_LIVES = 5;
@@ -56,7 +91,7 @@ interface DuelRoundState {
 
 const rooms: Record<string, {
   players: Record<string, PlayerState>;
-  status: 'waiting' | 'playing' | 'ended';
+  status: 'waiting' | 'playing' | 'ended' | 'awaiting_confirmation';
   time: number;
   difficulty: number;
   mode: string;
@@ -322,6 +357,17 @@ function startSoloRound(roomId: string) {
 io.on('connection', (socket: Socket) => {
   console.log('User connected:', socket.id);
 
+  socket.on('check_random_available', (_data: any, ack) => {
+    const roomId = Object.keys(rooms).find(r =>
+      Object.keys(rooms[r].players).length < 2 &&
+      rooms[r].status === 'waiting' &&
+      rooms[r].mode === 'duel' &&
+      !rooms[r].isPrivate
+    );
+    if (roomId) ack?.({ available: true, betAmount: rooms[roomId].duelBetAmount });
+    else ack?.({ available: false });
+  });
+
   socket.on('duel_join_random', (data: { name: string; role: string; level?: number; betAmount?: number }, ack?: (res: { ok: true; roomId: string } | { ok: false; message: string }) => void) => {
     const gameMode = 'duel';
     const desiredBet = normalizeDuelBetAmount(data.betAmount);
@@ -329,8 +375,7 @@ io.on('connection', (socket: Socket) => {
       Object.keys(rooms[r].players).length < 2 &&
       rooms[r].status === 'waiting' &&
       rooms[r].mode === gameMode &&
-      !rooms[r].isPrivate &&
-      (rooms[r].duelBetAmount ?? desiredBet) === desiredBet
+      !rooms[r].isPrivate
     );
 
     if (!roomId) {
@@ -357,8 +402,26 @@ io.on('connection', (socket: Socket) => {
 
     ack?.({ ok: true, roomId });
 
-    if (Object.keys(rooms[roomId].players).length === 2) {
-      startMatch(roomId);
+    const playersCount = Object.keys(rooms[roomId].players).length;
+    if (playersCount === 2) {
+      // Request stake confirmation from the newly joined player before starting
+      rooms[roomId].status = 'awaiting_confirmation';
+      // store which player needs to confirm
+      (rooms[roomId] as any).awaitingConfirmation = socket.id;
+      socket.emit('request_stake_confirmation', { roomId, betAmount: rooms[roomId].duelBetAmount });
+
+      // start a timeout to remove the joining player if they don't confirm
+      const t = setTimeout(() => {
+        const room = rooms[roomId];
+        if (!room) return;
+        if ((room as any).awaitingConfirmation === socket.id) {
+          // remove player
+          delete room.players[socket.id];
+          delete (room as any).awaitingConfirmation;
+          io.to(roomId).emit('player_left', { players: room.players, roomId, roomCode: room.roomCode });
+        }
+      }, 20000);
+      (rooms[roomId] as any).confirmTimer = t;
     }
   });
 
@@ -411,12 +474,7 @@ io.on('connection', (socket: Socket) => {
       return;
     }
 
-    if (room.duelBetAmount && room.duelBetAmount !== desiredBet) {
-      const msg = `Stake mismatch. Room stake is ${room.duelBetAmount}.`;
-      socket.emit('duel_join_error', { message: msg });
-      ack?.({ ok: false, message: msg });
-      return;
-    }
+    // We let the player join regardless of the betAmount they passed, because they will be asked to confirm the room's actual betAmount before the match starts.
 
     if (!room.duelBetAmount) {
       room.duelBetAmount = desiredBet;
@@ -429,8 +487,22 @@ io.on('connection', (socket: Socket) => {
 
     ack?.({ ok: true, roomId, roomCode: room.roomCode });
 
-    if (Object.keys(room.players).length === 2) {
-      startMatch(roomId);
+    const playersCount = Object.keys(room.players).length;
+    if (playersCount === 2) {
+      room.status = 'awaiting_confirmation';
+      (room as any).awaitingConfirmation = socket.id;
+      socket.emit('request_stake_confirmation', { roomId, betAmount: room.duelBetAmount });
+
+      const t = setTimeout(() => {
+        const r = rooms[roomId];
+        if (!r) return;
+        if ((r as any).awaitingConfirmation === socket.id) {
+          delete r.players[socket.id];
+          delete (r as any).awaitingConfirmation;
+          io.to(roomId).emit('player_left', { players: r.players, roomId, roomCode: r.roomCode });
+        }
+      }, 20000);
+      (room as any).confirmTimer = t;
     }
   });
 
@@ -656,6 +728,26 @@ io.on('connection', (socket: Socket) => {
     io.to(roomId).emit('state_update', { players: room.players });
   });
 
+  // Joining player confirms they accept the room stake; only then start the match.
+  socket.on('confirm_stake', (data: { roomId: string }) => {
+    const { roomId } = data;
+    const room = rooms[roomId];
+    if (!room) return;
+    const waitingFor = (room as any).awaitingConfirmation;
+    if (!waitingFor) return;
+    if (waitingFor !== socket.id) return; // only the awaiting player may confirm
+
+    // clear timeout
+    if ((room as any).confirmTimer) {
+      clearTimeout((room as any).confirmTimer);
+      delete (room as any).confirmTimer;
+    }
+    delete (room as any).awaitingConfirmation;
+
+    // start the match now
+    startMatch(roomId);
+  });
+
   socket.on('disconnect', () => {
     for (const roomId in rooms) {
       if (rooms[roomId].players[socket.id]) {
@@ -684,6 +776,16 @@ io.on('connection', (socket: Socket) => {
             });
           }
           emitDuelState(roomId);
+        }
+
+        // If a player who was awaiting confirmation disconnected, clear the timer
+        const roomObj = rooms[roomId] as any;
+        if (roomObj && roomObj.awaitingConfirmation === socket.id) {
+          if (roomObj.confirmTimer) {
+            clearTimeout(roomObj.confirmTimer);
+            delete roomObj.confirmTimer;
+          }
+          delete roomObj.awaitingConfirmation;
         }
 
         io.to(roomId).emit('player_left', { players: rooms[roomId].players, roomId, roomCode: rooms[roomId].roomCode });
@@ -761,7 +863,7 @@ function startMatch(roomId: string) {
   }, 1000);
 }
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`BattleQ Game Engine Running on Port ${PORT}`);
   console.log(`- AI Engine: ONLINE`);
   console.log(`- Behavior Engine: ONLINE`);

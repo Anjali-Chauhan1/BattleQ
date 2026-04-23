@@ -84,6 +84,8 @@ export function MultiplayerGameScreen() {
   const [pendingJoinIntent, setPendingJoinIntent] = useState<PendingJoinIntent | null>(null);
   const [stakeAmount, setStakeAmount] = useState<number>(STAKE_MIN);
   const [selectedStake, setSelectedStake] = useState<number>(STAKE_MIN);
+  const [awaitingStakeConfirm, setAwaitingStakeConfirm] = useState(false);
+  const [stakeLocked, setStakeLocked] = useState(false);
   const pendingJoinIntentRef = useRef<PendingJoinIntent | null>(null);
 
   const clampStake = (value: number) => Math.min(STAKE_MAX, Math.max(STAKE_MIN, value));
@@ -159,6 +161,19 @@ export function MultiplayerGameScreen() {
       socket.emit("request_duel_state", { roomId: payload.roomId });
     };
 
+    const onRequestStakeConfirmation = (payload: { roomId: string; betAmount: number }) => {
+      // Show stake confirmation UI with the room's bet and force confirm
+      setRoomId(payload.roomId);
+      setStakeAmount(payload.betAmount);
+      setSelectedStake(payload.betAmount);
+      setStakeLocked(true);
+      setAwaitingStakeConfirm(true);
+      setPhase("stake");
+      setStatusText("Confirm stake to start");
+      setIsJoining(false);
+      setJoinError(null);
+    };
+
     const onJoinError = (payload: { message: string }) => {
       const message = payload?.message || "Unable to join room";
       setJoinError(message);
@@ -186,6 +201,7 @@ export function MultiplayerGameScreen() {
     socket.on("player_left", onPlayerLeft);
     socket.on("duel_room_created", onRoomCreated);
     socket.on("duel_join_error", onJoinError);
+    socket.on("request_stake_confirmation", onRequestStakeConfirmation);
 
     return () => {
       socket.off("player_joined", onPlayerJoined);
@@ -195,6 +211,7 @@ export function MultiplayerGameScreen() {
       socket.off("player_left", onPlayerLeft);
       socket.off("duel_room_created", onRoomCreated);
       socket.off("duel_join_error", onJoinError);
+      socket.off("request_stake_confirmation", onRequestStakeConfirmation);
     };
   }, [socket, isConnected]);
 
@@ -384,6 +401,15 @@ export function MultiplayerGameScreen() {
   };
 
   const confirmStakeAndJoin = () => {
+    // If we're confirming a server-requested stake, tell server to proceed
+    if (awaitingStakeConfirm && roomId && socket) {
+      setAwaitingStakeConfirm(false);
+      setStakeLocked(false);
+      setStatusText("Waiting for opponent...");
+      socket.emit("confirm_stake", { roomId });
+      return;
+    }
+
     if (!pendingJoinIntent) {
       setPhase("menu");
       setStatusText("Choose how to play");
@@ -465,35 +491,47 @@ export function MultiplayerGameScreen() {
                 <p className="text-[10px] uppercase tracking-widest text-white/50">Stake Amount</p>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="flex items-baseline gap-3">
-                    <input
-                      value={Number.isFinite(stakeAmount) ? stakeAmount : STAKE_MIN}
-                      onChange={(e) => {
-                        const raw = e.target.value.replace(/\D/g, "");
-                        const next = raw ? parseInt(raw, 10) : STAKE_MIN;
-                        setStakeAmount(clampStake(next));
-                      }}
-                      inputMode="numeric"
-                      className="w-32 bg-transparent text-4xl font-black tracking-tight text-primary outline-none border-b border-primary/40"
-                    />
+                    {stakeLocked ? (
+                      <div className="w-32 bg-transparent text-4xl font-black tracking-tight text-primary">
+                        {stakeAmount}
+                      </div>
+                    ) : (
+                      <input
+                        value={Number.isFinite(stakeAmount) ? stakeAmount : STAKE_MIN}
+                        onChange={(e) => {
+                          if (stakeLocked) return;
+                          const raw = e.target.value.replace(/\D/g, "");
+                          const next = raw ? parseInt(raw, 10) : STAKE_MIN;
+                          setStakeAmount(clampStake(next));
+                        }}
+                        inputMode="numeric"
+                        className="w-32 bg-transparent text-4xl font-black tracking-tight text-primary outline-none border-b border-primary/40"
+                        disabled={stakeLocked}
+                      />
+                    )}
                     <span className="text-[10px] font-black uppercase tracking-widest text-white/50">BQT</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setStakeAmount((v) => clampStake(v - STAKE_STEP))}
-                      className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10"
-                    >
-                      -{STAKE_STEP}
-                    </button>
-                    <button
-                      onClick={() => setStakeAmount((v) => clampStake(v + STAKE_STEP))}
-                      className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10"
-                    >
-                      +{STAKE_STEP}
-                    </button>
-                  </div>
+                  {!stakeLocked && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => !stakeLocked && setStakeAmount((v) => clampStake(v - STAKE_STEP))}
+                        className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10"
+                        disabled={stakeLocked}
+                      >
+                        -{STAKE_STEP}
+                      </button>
+                      <button
+                        onClick={() => !stakeLocked && setStakeAmount((v) => clampStake(v + STAKE_STEP))}
+                        className="px-4 py-2 text-[10px] font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10"
+                        disabled={stakeLocked}
+                      >
+                        +{STAKE_STEP}
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-[11px] text-white/50 mt-2">Min {STAKE_MIN} • Max {STAKE_MAX}</p>
+                {!stakeLocked && <p className="text-[11px] text-white/50 mt-2">Min {STAKE_MIN} • Max {STAKE_MAX}</p>}
                 {joinError && <p className="text-xs text-red-400 mt-2">{joinError}</p>}
               </div>
 
@@ -504,6 +542,8 @@ export function MultiplayerGameScreen() {
                     setStatusText("Choose how to play");
                     setPendingJoinIntent(null);
                     setJoinError(null);
+                    setAwaitingStakeConfirm(false);
+                    setStakeLocked(false);
                   }}
                   disabled={isJoining}
                   className="flex-1 px-5 py-4 text-xs font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -519,9 +559,15 @@ export function MultiplayerGameScreen() {
                 </button>
               </div>
 
-              <p className="text-[11px] text-white/45">
-                Tip: If you stake {STAKE_MIN}, you can increase up to {STAKE_MAX}.
-              </p>
+              {stakeLocked ? (
+                <p className="text-[11px] text-white/45">
+                  The room creator has set the stake amount to {stakeAmount} BQT.
+                </p>
+              ) : (
+                <p className="text-[11px] text-white/45">
+                  Tip: If you stake {STAKE_MIN}, you can increase up to {STAKE_MAX}.
+                </p>
+              )}
             </section>
           )}
 
@@ -556,7 +602,21 @@ export function MultiplayerGameScreen() {
             )}
 
             <button
-              onClick={() => startStakeFor({ type: "random" })}
+              onClick={() => {
+                if (!socket || !isConnected) return;
+                socket.timeout(2000).emit("check_random_available", {}, (err: unknown, res?: { available: boolean; betAmount?: number }) => {
+                  if (err || !res) {
+                    startStakeFor({ type: "random" });
+                    return;
+                  }
+                  if (res.available) {
+                    setPendingJoinIntent({ type: "random" });
+                    joinRandom(res.betAmount || STAKE_MIN);
+                  } else {
+                    startStakeFor({ type: "random" });
+                  }
+                });
+              }}
               disabled={!isConnected || isJoining}
               className="w-full px-5 py-4 text-xs font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
@@ -587,7 +647,10 @@ export function MultiplayerGameScreen() {
                       setJoinError("Enter a room code");
                       return;
                     }
-                    startStakeFor({ type: "code", code });
+                    // Removed startStakeFor so we skip the adjustment screen and join directly.
+                    // Backend will read the room's stake and immediately respond with a stake confirmation lock.
+                    setPendingJoinIntent({ type: "code", code });
+                    joinByCode(code, STAKE_MIN);
                   }}
                   disabled={!isConnected || isJoining}
                   className="px-5 py-3 text-xs font-black uppercase tracking-widest border border-white/20 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
