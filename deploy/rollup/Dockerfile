@@ -44,20 +44,25 @@ RUN ARCH=$(dpkg --print-architecture) && \
 ARG MINIEVM_VERSION=v1.2.15
 RUN ARCH=$(dpkg --print-architecture) && \
     echo "Downloading minitiad ${MINIEVM_VERSION} for ${ARCH}..." && \
+    mkdir -p /tmp/minitiad-extract && \
     if [ "$ARCH" = "amd64" ]; then \
-      wget -qO /usr/local/bin/minitiad \
-        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minitiad_${MINIEVM_VERSION}_linux_amd64" 2>/dev/null || \
       wget -qO /tmp/minitiad.tar.gz \
-        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minitiad_${MINIEVM_VERSION}_linux_amd64.tar.gz" 2>/dev/null && \
-      tar -xzf /tmp/minitiad.tar.gz -C /usr/local/bin minitiad 2>/dev/null; \
+        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minievm_${MINIEVM_VERSION}_Linux_x86_64.tar.gz" && \
+      tar -xzf /tmp/minitiad.tar.gz -C /tmp/minitiad-extract; \
     elif [ "$ARCH" = "arm64" ]; then \
-      wget -qO /usr/local/bin/minitiad \
-        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minitiad_${MINIEVM_VERSION}_linux_arm64" 2>/dev/null || \
       wget -qO /tmp/minitiad.tar.gz \
-        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minitiad_${MINIEVM_VERSION}_linux_arm64.tar.gz" 2>/dev/null && \
-      tar -xzf /tmp/minitiad.tar.gz -C /usr/local/bin minitiad 2>/dev/null; \
+        "https://github.com/initia-labs/minievm/releases/download/${MINIEVM_VERSION}/minievm_${MINIEVM_VERSION}_Linux_aarch64.tar.gz" && \
+      tar -xzf /tmp/minitiad.tar.gz -C /tmp/minitiad-extract; \
     fi && \
-    rm -f /tmp/minitiad.tar.gz && \
+    # Find the minitiad binary inside the extracted archive
+    if [ -f /tmp/minitiad-extract/minitiad ]; then \
+      cp /tmp/minitiad-extract/minitiad /usr/local/bin/minitiad; \
+    elif [ -f /tmp/minitiad-extract/minievm ]; then \
+      cp /tmp/minitiad-extract/minievm /usr/local/bin/minitiad; \
+    elif ls /tmp/minitiad-extract/minit* 1>/dev/null 2>&1; then \
+      cp /tmp/minitiad-extract/minit* /usr/local/bin/minitiad; \
+    fi && \
+    rm -rf /tmp/minitiad.tar.gz /tmp/minitiad-extract && \
     # Fallback: if the release download didn't work, use the local copy
     if [ ! -f /usr/local/bin/minitiad ] && [ -f /tmp/context-minitiad ]; then \
       cp /tmp/context-minitiad /usr/local/bin/minitiad; \
