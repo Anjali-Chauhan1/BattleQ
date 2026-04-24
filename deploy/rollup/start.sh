@@ -69,6 +69,10 @@ if [[ -f "$APP_TOML" ]]; then
   sed -i 's|ws-address = "localhost:8546"|ws-address = "0.0.0.0:8546"|g' "$APP_TOML"
   # Enable JSON-RPC and WS
   sed -i '/\[json-rpc\]/,/^\[/ s|enable = false|enable = true|' "$APP_TOML"
+  # Reduce IAVL cache to prevent OOM on Railway free tier
+  sed -i 's|iavl-cache-size = 781250|iavl-cache-size = 10000|g' "$APP_TOML"
+  # Explicitly disable versiondb (requires rocksdb build tag)
+  sed -i '/\[versiondb\]/,/^\[/ s|enable = true|enable = false|' "$APP_TOML"
 fi
 
 echo "✓ Config patched"
@@ -94,4 +98,6 @@ exec minitiad start \
   --json-rpc.address-ws "0.0.0.0:8546" \
   --json-rpc.enable-ws \
   --json-rpc.apis "eth,net,web3,txpool" \
+  --versiondb.enable=false \
+  --iavl-disable-fastnode \
   2>&1
