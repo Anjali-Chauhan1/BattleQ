@@ -4,7 +4,7 @@
 #  Runs inside the Docker container on Railway.
 # ══════════════════════════════════════════════════════════════
 
-set -euo pipefail
+set -eo pipefail
 
 MINITIA_HOME="${MINITIA_HOME:-/root/.minitia}"
 LOG_DIR="/var/log/battleq"
@@ -86,10 +86,11 @@ echo "════════════════════════�
 
 # Run minitiad in the foreground so Docker/Railway can monitor it.
 # If minitiad crashes, the container exits and Railway restarts it.
+# Railway captures stdout/stderr automatically — no need for tee.
 exec minitiad start \
   --home "$MINITIA_HOME" \
   --json-rpc.enable \
   --json-rpc.address "0.0.0.0:8545" \
   --json-rpc.ws-address "0.0.0.0:8546" \
   --json-rpc.api "eth,net,web3,txpool" \
-  2>&1 | tee "$LOG_DIR/minitiad.log"
+  2>&1
