@@ -1,0 +1,83 @@
+# ══════════════════════════════════════════════════════════════
+#  Caddy Reverse Proxy — Route all rollup services through
+#  a single port for Railway deployment.
+#
+#  Railway injects the PORT env var at runtime.
+#
+#  Routing:
+#    /              → EVM JSON-RPC     (localhost:8545)
+#    /ws            → EVM WebSocket    (localhost:8546)
+#    /rpc/*         → Tendermint RPC   (localhost:26657)
+#    /rest/*        → Cosmos REST API  (localhost:1317)
+#    /grpc/*        → gRPC             (localhost:9090)
+#    /healthz       → Simple health endpoint
+# ══════════════════════════════════════════════════════════════
+
+:{$PORT:8080} {
+	# ── Logging ──────────────────────────────────────────────
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+
+	# ── CORS headers (allow frontend from any origin) ────────
+	header {
+		Access-Control-Allow-Origin *
+		Access-Control-Allow-Methods "GET, POST, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type, Authorization"
+		Access-Control-Max-Age 86400
+	}
+
+	# Handle CORS preflight
+	@options method OPTIONS
+	respond @options 204
+
+	# ── Health check endpoint ────────────────────────────────
+	handle /healthz {
+		respond "OK" 200
+	}
+
+	# ── WebSocket: detect Upgrade header → EVM WS port ──────
+	@websocket {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	handle @websocket {
+		reverse_proxy localhost:8546
+	}
+
+	# ── Explicit /ws path for WebSocket ──────────────────────
+	handle /ws {
+		reverse_proxy localhost:8546
+	}
+	handle /ws/* {
+		reverse_proxy localhost:8546
+	}
+
+	# ── Cosmos Tendermint RPC ────────────────────────────────
+	handle_path /rpc/* {
+		reverse_proxy localhost:26657
+	}
+	handle /rpc {
+		reverse_proxy localhost:26657
+	}
+
+	# ── Cosmos REST API ──────────────────────────────────────
+	handle_path /rest/* {
+		reverse_proxy localhost:1317
+	}
+	handle /rest {
+		reverse_proxy localhost:1317
+	}
+
+	# ── gRPC ─────────────────────────────────────────────────
+	handle_path /grpc/* {
+		reverse_proxy localhost:9090
+	}
+
+	# ── Default: EVM JSON-RPC ────────────────────────────────
+	handle {
+		reverse_proxy localhost:8545
+	}
+}
