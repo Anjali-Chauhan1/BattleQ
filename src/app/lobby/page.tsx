@@ -120,7 +120,7 @@ export default function Lobby() {
                             </div>
                             <h3 className="text-6xl md:text-8xl font-black italic tracking-tighter uppercase leading-[0.9]">
                                 Engage Your Next <br />
-                                <span className="neon-text-blue drop-shadow-[0_0_20px_rgba(0,242,255,0.4)]">Tactical Phase</span>
+                                <span className="neon-text-blue drop-shadow-[0_0_10px_rgba(0,242,255,0.2)]">Tactical Phase</span>
                             </h3>
                             <p className="text-gray-400 text-lg md:text-xl font-medium max-w-xl italic leading-relaxed font-sans">
                                 Stake your reputation, form alliances, and out-maneuver your opponents.
