@@ -58,7 +58,7 @@ RUN set -e && \
 
 # ── Fallback: copy local minitiad if provided ────────────────
 # If the GitHub release download fails, provide it in context/
-COPY context/minitiad* /tmp/fallback-minitiad
+COPY deploy/rollup/context/minitiad* /tmp/fallback-minitiad
 RUN if [ ! -x /usr/local/bin/minitiad ] && [ -f /tmp/fallback-minitiad ]; then \
       cp /tmp/fallback-minitiad /usr/local/bin/minitiad && \
       chmod +x /usr/local/bin/minitiad; \
@@ -66,11 +66,11 @@ RUN if [ ! -x /usr/local/bin/minitiad ] && [ -f /tmp/fallback-minitiad ]; then \
     rm -f /tmp/fallback-minitiad
 
 # ── Copy chain config + data ─────────────────────────────────
-COPY context/.minitia /root/.minitia
+COPY deploy/rollup/context/.minitia /root/.minitia
 
 # ── Copy proxy & startup configs ─────────────────────────────
-COPY Caddyfile /etc/caddy/Caddyfile
-COPY start.sh /start.sh
+COPY deploy/rollup/Caddyfile /etc/caddy/Caddyfile
+COPY deploy/rollup/start.sh /start.sh
 RUN chmod +x /start.sh
 
 # ── Railway injects PORT at runtime (typically 8080) ─────────
