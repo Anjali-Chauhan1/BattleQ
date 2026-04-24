@@ -70,7 +70,7 @@ COPY context/.minitia /root/.minitia
 
 # ── Copy proxy & startup configs ─────────────────────────────
 COPY Caddyfile /etc/caddy/Caddyfile
-COPY start.sh /start.sh
+COPY context/start.sh /start.sh
 RUN chmod +x /start.sh
 
 # ── Railway injects PORT at runtime (typically 8080) ─────────
