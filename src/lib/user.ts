@@ -75,6 +75,36 @@ export function applyDuelSettlement(roomId: string, delta: number): boolean {
   return true;
 }
 
+export function getDuelStakePaidKey(roomId: string): string {
+  return `battleq_duel_stake_paid:${getWalletId().toLowerCase()}:${roomId}`;
+}
+
+export function hasDuelStakePaid(roomId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(getDuelStakePaidKey(roomId)) === "true";
+}
+
+export function markDuelStakePaid(roomId: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(getDuelStakePaidKey(roomId), "true");
+  }
+}
+
+export function getDuelPayoutClaimedKey(roomId: string): string {
+  return `battleq_duel_payout_claimed:${getWalletId().toLowerCase()}:${roomId}`;
+}
+
+export function hasDuelPayoutClaimed(roomId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(getDuelPayoutClaimedKey(roomId)) === "true";
+}
+
+export function markDuelPayoutClaimed(roomId: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(getDuelPayoutClaimedKey(roomId), "true");
+  }
+}
+
 export function markPracticeRoundComplete(level: number) {
   if (typeof window !== "undefined") {
     getPracticeRoundKeys(level).forEach((key) => {
