@@ -635,6 +635,7 @@ io.on('connection', (socket: Socket) => {
         room.status = 'ended';
         player.wins += 1;
         io.to(roomId).emit('match_ended', {
+          roomId,
           leaderboard: duelPlayers
             .map((p) => ({ ...p, score: duelRound.lives[p.id] ?? 0 }))
             .sort((a, b) => (duelRound.lives[b.id] ?? 0) - (duelRound.lives[a.id] ?? 0)),
@@ -768,6 +769,7 @@ io.on('connection', (socket: Socket) => {
             rooms[roomId].duelRound.winnerId = remaining[0].id;
             rooms[roomId].status = 'ended';
             io.to(roomId).emit('match_ended', {
+              roomId,
               winnerId: remaining[0].id,
               leaderboard: remaining,
               betAmount: rooms[roomId].duelRound.betAmount,
@@ -855,6 +857,7 @@ function startMatch(roomId: string) {
       clearInterval(interval);
       room.status = 'ended';
       io.to(roomId).emit('match_ended', {
+        roomId,
         leaderboard: Object.values(room.players).sort((a, b) => b.score - a.score)
       });
       // Cleanup room after 1 minute
