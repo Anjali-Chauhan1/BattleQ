@@ -91,7 +91,7 @@ export default function Arena() {
                                     level={solo.level}
                                     stakeAmount={currentStake}
                                     potentialReward={potentialReward}
-                                    onConfirm={() => setSoloStatus('playing')}
+                                    onConfirm={() => setSoloStatus('rules')}
                                     onCancel={() => setSoloStatus('selecting')}
                                     onStakeChange={isElite ? setStake : undefined}
                                 />

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getPracticeUnlockedLevel, hasCompletedPracticeRound, markPracticeRoundComplete } from '@/lib/user';
+import { getBtqSettlementDelta, getPracticeUnlockedLevel, hasCompletedPracticeRound, markPracticeRoundComplete } from '@/lib/user';
 
 export interface Player {
   id: string;
@@ -60,6 +60,7 @@ interface GameState {
   resetSolo: () => void;
   nextLevel: () => void;
   syncScore: (onChainBalance: number) => void;
+  applyBtqDelta: (delta: number) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -279,7 +280,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   syncScore: (onChainBalance: number) => set((state) => ({
     solo: {
       ...state.solo,
-      score: onChainBalance,
+      score: onChainBalance + getBtqSettlementDelta(),
+    }
+  })),
+
+  applyBtqDelta: (delta) => set((state) => ({
+    solo: {
+      ...state.solo,
+      score: Math.max(0, state.solo.score + delta),
     }
   })),
 }));

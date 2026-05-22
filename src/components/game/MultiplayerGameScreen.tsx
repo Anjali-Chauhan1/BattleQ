@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { Heart, Crosshair, ShieldPlus, SkipForward, Users, Bomb, Search } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { TutorialTour } from "@/components/game/TutorialTour";
-import { getWalletUser } from "@/lib/user";
+import { applyDuelSettlement, getWalletUser } from "@/lib/user";
+import { useGameStore } from "@/store/useGameStore";
 
 type ChestItem = "gun" | "health" | "skip" | "double_kill" | "magnifier" | "empty";
 
@@ -71,6 +72,8 @@ export function MultiplayerGameScreen() {
   const [phase, setPhase] = useState<"menu" | "stake" | "waiting" | "in_game">("menu");
   const [waitingCount, setWaitingCount] = useState(0);
   const [didCopyCode, setDidCopyCode] = useState(false);
+  const applyBtqDelta = useGameStore((state) => state.applyBtqDelta);
+  const settlementAppliedRef = useRef<string | null>(null);
 
   const STAKE_MIN = 50;
   const STAKE_MAX = 200;
@@ -194,6 +197,23 @@ export function MultiplayerGameScreen() {
       }
     };
 
+    const onMatchEnded = (payload: { roomId?: string; winnerId?: string | null; betAmount?: number; totalPot?: number }) => {
+      const matchKey = payload.roomId || roomId || "duel";
+      if (settlementAppliedRef.current === matchKey) return;
+
+      const betAmount = payload.betAmount ?? STAKE_MIN;
+      const totalPot = payload.totalPot ?? betAmount * 2;
+      const isWinner = Boolean(socket?.id && payload.winnerId && socket.id === payload.winnerId);
+      const delta = isWinner ? totalPot : -betAmount;
+
+      if (applyDuelSettlement(matchKey, delta)) {
+        applyBtqDelta(delta);
+      }
+
+      settlementAppliedRef.current = matchKey;
+      setStatusText(isWinner ? `You won +${totalPot} BTQ` : `You lost ${betAmount} BTQ`);
+    };
+
     socket.on("player_joined", onPlayerJoined);
     socket.on("match_started", onMatchStarted);
     socket.on("duel_state", onDuelState);
@@ -202,6 +222,7 @@ export function MultiplayerGameScreen() {
     socket.on("duel_room_created", onRoomCreated);
     socket.on("duel_join_error", onJoinError);
     socket.on("request_stake_confirmation", onRequestStakeConfirmation);
+    socket.on("match_ended", onMatchEnded);
 
     return () => {
       socket.off("player_joined", onPlayerJoined);
@@ -212,8 +233,9 @@ export function MultiplayerGameScreen() {
       socket.off("duel_room_created", onRoomCreated);
       socket.off("duel_join_error", onJoinError);
       socket.off("request_stake_confirmation", onRequestStakeConfirmation);
+      socket.off("match_ended", onMatchEnded);
     };
-  }, [socket, isConnected]);
+  }, [socket, isConnected, roomId, applyBtqDelta]);
 
   useEffect(() => {
     if (!isMyTurn) {
@@ -709,18 +731,31 @@ export function MultiplayerGameScreen() {
               return (
                 <div
                   key={player?.id || idx}
-                  className={`border p-3 transition-all ${
+                  className={`relative overflow-hidden border p-3 transition-all duration-300 ${
                     isTurnForPlayer
-                      ? "border-primary/70 bg-primary/10 shadow-[0_0_30px_rgba(0,242,255,0.12)]"
+                      ? "border-primary bg-primary/15 shadow-[0_0_40px_rgba(0,242,255,0.22)] ring-1 ring-primary/40 scale-[1.01]"
                       : "border-white/12 bg-black/50"
                   }`}
                 >
+                  {isTurnForPlayer && (
+                    <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse" />
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[9px] tracking-[0.25em] text-white/40 uppercase">{idx === 0 ? "You" : "Opponent"}</p>
-                      <p className="text-lg md:text-xl font-black uppercase tracking-tight">{player?.name || "Waiting..."}</p>
+                      <p className={`text-lg md:text-xl font-black uppercase tracking-tight ${isTurnForPlayer ? "text-primary" : "text-white"}`}>
+                        {player?.name || "Waiting..."}
+                      </p>
                     </div>
-                    <Users className="w-5 h-5 text-primary/80" />
+                    <div className="flex flex-col items-end gap-1">
+                      {isTurnForPlayer ? (
+                        <span className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.25em] bg-primary text-black">
+                          Your Turn
+                        </span>
+                      ) : (
+                        <Users className="w-5 h-5 text-primary/80" />
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     {Array.from({ length: maxLives }).map((_, i) => (

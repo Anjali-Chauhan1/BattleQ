@@ -106,7 +106,7 @@ export const LossStakingCard: React.FC<LossStakingCardProps> = ({
                         className="px-6 py-4 bg-white/5 border border-white/10 text-white/50 font-black uppercase text-xs tracking-[0.2em] hover:bg-white/10 transition-all"
                         style={{ clipPath: 'polygon(15% 0, 100% 0, 85% 100%, 0 100%)' }}
                     >
-                        ABORT_HUNT
+                        FIX_PAYMENT
                     </button>
                     <button
                         onClick={onRetry}

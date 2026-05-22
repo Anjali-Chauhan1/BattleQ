@@ -49,6 +49,32 @@ export function getPracticeUnlockedLevel(): number {
   return 1;
 }
 
+export function getBtqSettlementKey(): string {
+  return `battleq_btq_settlement_delta:${getWalletId().toLowerCase()}`;
+}
+
+export function getBtqSettlementDelta(): number {
+  if (typeof window === "undefined") return 0;
+  const raw = Number(localStorage.getItem(getBtqSettlementKey()) || 0);
+  return Number.isFinite(raw) ? raw : 0;
+}
+
+export function getBtqSettlementMarkerKey(roomId: string): string {
+  return `battleq_duel_settled:${getWalletId().toLowerCase()}:${roomId}`;
+}
+
+export function applyDuelSettlement(roomId: string, delta: number): boolean {
+  if (typeof window === "undefined") return false;
+
+  const markerKey = getBtqSettlementMarkerKey(roomId);
+  if (localStorage.getItem(markerKey) === "true") return false;
+
+  const currentDelta = getBtqSettlementDelta();
+  localStorage.setItem(getBtqSettlementKey(), String(currentDelta + delta));
+  localStorage.setItem(markerKey, "true");
+  return true;
+}
+
 export function markPracticeRoundComplete(level: number) {
   if (typeof window !== "undefined") {
     getPracticeRoundKeys(level).forEach((key) => {
