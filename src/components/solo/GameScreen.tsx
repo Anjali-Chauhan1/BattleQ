@@ -28,6 +28,14 @@ export const GameScreen = () => {
     };
     const contractAddress = contractAddressByChain[chainId] || process.env.NEXT_PUBLIC_BTQ_ADDRESS || "";
 
+    const ensureContractReady = () => {
+        if (!contractAddress) {
+            alert(`BTQ contract address not configured for chain ${chainId}.`);
+            return false;
+        }
+        return true;
+    };
+
     const tryStart = (lvl: number) => {
         const practiceStakes = [5, 10, 15];
         const required = lvl > 3 ? solo.stake : (practiceStakes[lvl - 1] || lvl * 5);
@@ -44,6 +52,7 @@ export const GameScreen = () => {
 
     const handleClaimReward = async () => {
         try {
+            if (!ensureContractReady()) return;
             setIsPending(true);
             const multiplier = isElite ? (1.5 + (solo.revealedTiles.size * 0.1)) : (1.5 + (solo.level * 0.2));
             const winAmount = Math.floor(currentStake * multiplier);
@@ -57,7 +66,8 @@ export const GameScreen = () => {
             nextLevel();
         } catch (error) {
             console.error(error);
-            alert("Failed to claim reward.");
+            const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+            alert(`Failed to claim reward. ${msg}`);
         } finally {
             setIsPending(false);
         }
@@ -65,6 +75,7 @@ export const GameScreen = () => {
 
     const handlePayPenalty = async () => {
         try {
+            if (!ensureContractReady()) return;
             setIsPending(true);
             await writeContractAsync({
                 address: contractAddress as `0x${string}`,
@@ -75,7 +86,8 @@ export const GameScreen = () => {
             tryStart(solo.level);
         } catch (error) {
             console.error(error);
-            alert("Failed to pay penalty. Transaction rejected?");
+            const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+            alert(`Failed to pay penalty. ${msg}`);
         } finally {
             setIsPending(false);
         }

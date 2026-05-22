@@ -23,6 +23,7 @@ export function WalletPanel() {
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [buyStatus, setBuyStatus] = useState<string | null>(null);
   const [withdrawStatus, setWithdrawStatus] = useState<string | null>(null);
+  const minWithdrawBtq = 150;
 
   const contractAddressByChain: Record<number, string | undefined> = {
     46630: process.env.NEXT_PUBLIC_BTQ_ADDRESS_ROBINHOOD,
@@ -141,8 +142,8 @@ export function WalletPanel() {
       setWithdrawStatus(`Unsupported chain ${chainId}. Switch to Robinhood Testnet (46630) or Arbitrum Sepolia (421614).`);
       return;
     }
-    if (btqBalance <= 0 || !balanceRaw) {
-      setWithdrawStatus("Insufficient BTQ balance.");
+    if (btqBalance < minWithdrawBtq || !balanceRaw) {
+      setWithdrawStatus(`Minimum withdraw is ${minWithdrawBtq} BTQ.`);
       return;
     }
     
@@ -218,9 +219,9 @@ export function WalletPanel() {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           onClick={() => setShowWithdrawModal(!showWithdrawModal)}
-          disabled={btqBalance <= 0}
+          disabled={btqBalance < minWithdrawBtq}
           className={`flex items-center justify-center gap-2 px-4 py-3 border font-black uppercase text-[10px] tracking-widest rounded-lg transition-all ${
-            btqBalance > 0
+            btqBalance >= minWithdrawBtq
               ? "bg-secondary/20 border-secondary/40 text-secondary hover:bg-secondary/30"
               : "bg-white/5 border-white/10 text-white/30 cursor-not-allowed"
           }`}
@@ -229,6 +230,10 @@ export function WalletPanel() {
           SELL BTQ
         </motion.button>
       </div>
+
+      <p className="text-[9px] text-white/50 font-black uppercase tracking-widest">
+        Minimum withdraw: {minWithdrawBtq} BTQ
+      </p>
 
       {/* Buy Modal */}
       <AnimatePresence>
@@ -294,12 +299,13 @@ export function WalletPanel() {
           >
             <h4 className="text-[10px] font-black text-secondary uppercase tracking-widest">Sell BTQ</h4>
             <p className="text-[9px] text-white/60">Withdraw {btqBalance.toFixed(2)} BTQ to native currency</p>
+            <p className="text-[9px] text-white/50">Minimum withdraw: {minWithdrawBtq} BTQ</p>
 
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleWithdraw}
-              disabled={isTxLoading || isPending || operation === "withdraw" || btqBalance <= 0}
+              disabled={isTxLoading || isPending || operation === "withdraw" || btqBalance < minWithdrawBtq}
               className="w-full px-4 py-2 bg-secondary text-white font-bold rounded hover:bg-secondary/90 transition-all disabled:opacity-50"
             >
               {(isTxLoading || isPending) && operation === "withdraw" ? "Processing..." : "WITHDRAW ALL"}

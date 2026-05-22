@@ -22,6 +22,8 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
     onStakeChange
 }) => {
     const isElite = level > 3;
+    const maxStake = 1000;
+    const minStake = 1;
 
     return (
         <motion.div 
@@ -97,10 +99,12 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                                             value={stakeAmount === 0 ? '' : stakeAmount}
                                             onChange={(e) => {
                                                 const val = e.target.value.replace(/\D/g, '');
-                                                onStakeChange(val === '' ? 0 : parseInt(val));
+                                                const next = val === '' ? 0 : parseInt(val);
+                                                onStakeChange(Math.min(maxStake, Math.max(0, next)));
                                             }}
                                             onBlur={() => {
-                                                if (stakeAmount < 1) onStakeChange(1);
+                                                const next = Math.min(maxStake, Math.max(minStake, stakeAmount));
+                                                if (next !== stakeAmount) onStakeChange(next);
                                             }}
                                             className="bg-transparent text-5xl font-black text-white tracking-tighter w-40 focus:outline-none border-b-2 border-primary/50 transition-all hover:border-white/10"
                                         />
@@ -124,7 +128,7 @@ export const StakeConfirmation: React.FC<StakeConfirmationProps> = ({
                                     </button>
                                     <div className="w-[1px] h-6 bg-white/10" />
                                     <button 
-                                        onClick={() => onStakeChange(stakeAmount + 10)}
+                                        onClick={() => onStakeChange(Math.min(maxStake, stakeAmount + 10))}
                                         className="p-3 hover:bg-white/10 transition-colors text-primary rounded-md active:scale-90"
                                     >
                                         <Plus className="w-5 h-5" />
