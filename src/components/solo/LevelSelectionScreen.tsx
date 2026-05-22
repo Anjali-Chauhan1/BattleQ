@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Lock, CheckCircle2, Play, ChevronRight } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
+import { hasCompletedPracticeRound } from '@/lib/user';
 
 export const LevelSelectionScreen = () => {
     const { solo, startLevel } = useGameStore();
@@ -19,7 +20,8 @@ export const LevelSelectionScreen = () => {
     };
 
     const practiceLevels = [1, 2, 3];
-    const isEliteUnlocked = solo.unlockedLevel > 3;
+    const practiceCleared = practiceLevels.every((lvl) => hasCompletedPracticeRound(lvl));
+    const isEliteUnlocked = solo.unlockedLevel > 3 || practiceCleared;
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] py-12 px-4 select-none">
@@ -45,9 +47,9 @@ export const LevelSelectionScreen = () => {
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {practiceLevels.map((lvl) => {
-                            const isCompleted = lvl < solo.unlockedLevel;
-                            const isCurrent = lvl === solo.unlockedLevel;
-                            const isLocked = lvl > solo.unlockedLevel;
+                            const isCompleted = hasCompletedPracticeRound(lvl);
+                            const isLocked = lvl > solo.unlockedLevel || isCompleted;
+                            const isCurrent = lvl === solo.unlockedLevel && !isCompleted;
 
                             return (
                                 <motion.button
@@ -59,7 +61,7 @@ export const LevelSelectionScreen = () => {
                                     className={`
                                         relative h-40 rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300 overflow-hidden
                                         ${isCurrent ? 'border-primary bg-primary/10 shadow-[0_0_40px_rgba(0,242,255,0.15)]' : ''}
-                                        ${isCompleted ? 'border-secondary/40 bg-secondary/5 opacity-80' : ''}
+                                        ${isCompleted ? 'border-secondary/40 bg-secondary/5 opacity-60' : ''}
                                         ${isLocked ? 'border-white/10 bg-white/5 opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                                     `}
                                     style={{ clipPath: 'polygon(0 0, 92% 0, 100% 12%, 100% 100%, 8% 100%, 0 88%)' }}
@@ -73,11 +75,11 @@ export const LevelSelectionScreen = () => {
                                     <div className="absolute top-3 right-3">
                                         {isCompleted && <CheckCircle2 className="w-6 h-6 text-secondary shadow-[0_0_10px_rgba(34,197,94,0.5)]" />}
                                         {isCurrent && <Play className="w-6 h-6 text-primary animate-pulse shadow-[0_0_15px_rgba(0,242,255,1)]" />}
-                                        {isLocked && <Lock className="w-6 h-6 text-gray-600" />}
+                                        {isLocked && !isCompleted && <Lock className="w-6 h-6 text-gray-600" />}
                                     </div>
 
                                     <span className="text-[11px] font-black uppercase tracking-[0.3em] mt-3 opacity-60">
-                                        {isLocked ? 'ENCRYPTED' : 'BEGINNER_PHASE'}
+                                        {isCompleted ? 'COMPLETED' : (isLocked ? 'ENCRYPTED' : 'BEGINNER_PHASE')}
                                     </span>
                                 </motion.button>
                             );

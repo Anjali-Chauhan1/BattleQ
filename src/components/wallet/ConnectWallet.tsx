@@ -16,8 +16,10 @@ export function ConnectWallet() {
       // store a short user id like "0x1234...abcd"
       const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
       localStorage.setItem("battleq_user", short);
+      localStorage.setItem("battleq_wallet_id", address.toLowerCase());
     } else {
       localStorage.removeItem("battleq_user");
+      localStorage.removeItem("battleq_wallet_id");
     }
   }, [address, isConnected]);
 
