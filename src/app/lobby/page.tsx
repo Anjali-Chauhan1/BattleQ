@@ -135,8 +135,8 @@ export default function Lobby() {
                                 <span className="neon-text-blue drop-shadow-[0_0_10px_rgba(0,242,255,0.2)]">Tactical Phase</span>
                             </h3>
                             <p className="text-gray-400 text-lg md:text-xl font-medium max-w-xl italic leading-relaxed font-sans">
-                                Stake your reputation, form alliances, and out-maneuver your opponents.
-                                The behavior-engine adapts with every decision you make.
+                                Forge alliances, outplay your rivals, and shape every match with decisions that matter.
+                                In BattleQ, every move can shift the balance of power.
                             </p>
                         </div>
                         
