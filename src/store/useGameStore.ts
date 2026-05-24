@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getBtqSettlementDelta, getPracticeUnlockedLevel, hasCompletedPracticeRound, markPracticeRoundComplete } from '@/lib/user';
 
 export interface Player {
   id: string;
@@ -59,6 +60,7 @@ interface GameState {
   resetSolo: () => void;
   nextLevel: () => void;
   syncScore: (onChainBalance: number) => void;
+  applyBtqDelta: (delta: number) => void;
 }
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -70,7 +72,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   solo: {
     level: 1,
-    unlockedLevel: 1,
+    unlockedLevel: getPracticeUnlockedLevel(),
     movesLeft: 3,
     totalMoves: 3,
     gridSize: 3,
@@ -91,7 +93,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setTutorial: (show) => set({ showTutorial: show }),
 
   setStake: (amount) => set((state) => ({
-    solo: { ...state.solo, stake: amount }
+    solo: { ...state.solo, stake: Math.min(1000, Math.max(1, amount)) }
   })),
 
   setSoloStatus: (status) => set((state) => ({ 
@@ -100,12 +102,16 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startLevel: (level) => {
     const { solo } = get();
+    const practiceUnlockedLevel = getPracticeUnlockedLevel();
+    const effectiveUnlockedLevel = Math.max(solo.unlockedLevel, practiceUnlockedLevel);
     // Guard against playing levels not yet unlocked
-    if (level > solo.unlockedLevel) return;
+    if (level > effectiveUnlockedLevel) return;
+    if (level <= 3 && hasCompletedPracticeRound(level)) return;
+    const nextStake = level > 3 ? Math.min(1000, Math.max(1, solo.stake)) : solo.stake;
 
     // Show staking screen first
     set((state) => ({ 
-      solo: { ...state.solo, level, gameStatus: 'staking' } 
+      solo: { ...state.solo, level, gameStatus: 'staking', stake: nextStake, unlockedLevel: Math.max(state.solo.unlockedLevel, practiceUnlockedLevel) } 
     }));
 
     const isFixedGrid = level > 3;
@@ -187,6 +193,10 @@ export const useGameStore = create<GameState>((set, get) => ({
     const nextMoves = Math.max(0, solo.movesLeft - movesUsed);
 
     if (x === solo.treasurePos?.x && y === solo.treasurePos?.y) {
+      if (solo.level <= 3) {
+        markPracticeRoundComplete(solo.level);
+      }
+
       const isFixedGrid = solo.level > 3;
       const practiceStakes = [5, 10, 15];
       const stakeAmount = isFixedGrid ? solo.stake : (practiceStakes[solo.level - 1] || solo.level * 5);
@@ -253,7 +263,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     solo: {
       ...state.solo,
       level: 1,
-      unlockedLevel: 1,
+      unlockedLevel: getPracticeUnlockedLevel(),
       gameStatus: 'selecting',
       withdrawalUnlocked: false,
       stake: 50,
@@ -270,7 +280,14 @@ export const useGameStore = create<GameState>((set, get) => ({
   syncScore: (onChainBalance: number) => set((state) => ({
     solo: {
       ...state.solo,
-      score: onChainBalance,
+      score: onChainBalance + getBtqSettlementDelta(),
+    }
+  })),
+
+  applyBtqDelta: (delta) => set((state) => ({
+    solo: {
+      ...state.solo,
+      score: Math.max(0, state.solo.score + delta),
     }
   })),
 }));

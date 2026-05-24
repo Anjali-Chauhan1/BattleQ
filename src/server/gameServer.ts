@@ -406,18 +406,20 @@ io.on('connection', (socket: Socket) => {
     if (playersCount === 2) {
       // Request stake confirmation from the newly joined player before starting
       rooms[roomId].status = 'awaiting_confirmation';
-      // store which player needs to confirm
-      (rooms[roomId] as any).awaitingConfirmation = socket.id;
-      socket.emit('request_stake_confirmation', { roomId, betAmount: rooms[roomId].duelBetAmount });
+      const playersToConfirm = new Set(Object.keys(rooms[roomId].players));
+      (rooms[roomId] as any).awaitingConfirmations = playersToConfirm;
+      io.to(roomId).emit('request_stake_confirmation', { roomId, betAmount: rooms[roomId].duelBetAmount });
 
       // start a timeout to remove the joining player if they don't confirm
       const t = setTimeout(() => {
         const room = rooms[roomId];
         if (!room) return;
-        if ((room as any).awaitingConfirmation === socket.id) {
-          // remove player
-          delete room.players[socket.id];
-          delete (room as any).awaitingConfirmation;
+        const awaiting = (room as any).awaitingConfirmations as Set<string> | undefined;
+        if (awaiting && awaiting.size > 0) {
+          awaiting.forEach((playerId) => {
+            delete room.players[playerId];
+          });
+          delete (room as any).awaitingConfirmations;
           io.to(roomId).emit('player_left', { players: room.players, roomId, roomCode: room.roomCode });
         }
       }, 20000);
@@ -490,15 +492,19 @@ io.on('connection', (socket: Socket) => {
     const playersCount = Object.keys(room.players).length;
     if (playersCount === 2) {
       room.status = 'awaiting_confirmation';
-      (room as any).awaitingConfirmation = socket.id;
-      socket.emit('request_stake_confirmation', { roomId, betAmount: room.duelBetAmount });
+      const playersToConfirm = new Set(Object.keys(room.players));
+      (room as any).awaitingConfirmations = playersToConfirm;
+      io.to(roomId).emit('request_stake_confirmation', { roomId, betAmount: room.duelBetAmount });
 
       const t = setTimeout(() => {
         const r = rooms[roomId];
         if (!r) return;
-        if ((r as any).awaitingConfirmation === socket.id) {
-          delete r.players[socket.id];
-          delete (r as any).awaitingConfirmation;
+        const awaiting = (r as any).awaitingConfirmations as Set<string> | undefined;
+        if (awaiting && awaiting.size > 0) {
+          awaiting.forEach((playerId) => {
+            delete r.players[playerId];
+          });
+          delete (r as any).awaitingConfirmations;
           io.to(roomId).emit('player_left', { players: r.players, roomId, roomCode: r.roomCode });
         }
       }, 20000);
@@ -635,6 +641,7 @@ io.on('connection', (socket: Socket) => {
         room.status = 'ended';
         player.wins += 1;
         io.to(roomId).emit('match_ended', {
+          roomId,
           leaderboard: duelPlayers
             .map((p) => ({ ...p, score: duelRound.lives[p.id] ?? 0 }))
             .sort((a, b) => (duelRound.lives[b.id] ?? 0) - (duelRound.lives[a.id] ?? 0)),
@@ -733,19 +740,20 @@ io.on('connection', (socket: Socket) => {
     const { roomId } = data;
     const room = rooms[roomId];
     if (!room) return;
-    const waitingFor = (room as any).awaitingConfirmation;
-    if (!waitingFor) return;
-    if (waitingFor !== socket.id) return; // only the awaiting player may confirm
+    const awaiting = (room as any).awaitingConfirmations as Set<string> | undefined;
+    if (!awaiting || !awaiting.has(socket.id)) return;
+    awaiting.delete(socket.id);
 
     // clear timeout
     if ((room as any).confirmTimer) {
       clearTimeout((room as any).confirmTimer);
       delete (room as any).confirmTimer;
     }
-    delete (room as any).awaitingConfirmation;
-
-    // start the match now
-    startMatch(roomId);
+    if (awaiting.size === 0) {
+      delete (room as any).awaitingConfirmations;
+      // start the match now
+      startMatch(roomId);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -768,6 +776,7 @@ io.on('connection', (socket: Socket) => {
             rooms[roomId].duelRound.winnerId = remaining[0].id;
             rooms[roomId].status = 'ended';
             io.to(roomId).emit('match_ended', {
+              roomId,
               winnerId: remaining[0].id,
               leaderboard: remaining,
               betAmount: rooms[roomId].duelRound.betAmount,
@@ -780,12 +789,15 @@ io.on('connection', (socket: Socket) => {
 
         // If a player who was awaiting confirmation disconnected, clear the timer
         const roomObj = rooms[roomId] as any;
-        if (roomObj && roomObj.awaitingConfirmation === socket.id) {
+        if (roomObj && roomObj.awaitingConfirmations instanceof Set && roomObj.awaitingConfirmations.has(socket.id)) {
+          roomObj.awaitingConfirmations.delete(socket.id);
           if (roomObj.confirmTimer) {
             clearTimeout(roomObj.confirmTimer);
             delete roomObj.confirmTimer;
           }
-          delete roomObj.awaitingConfirmation;
+          if (roomObj.awaitingConfirmations.size === 0) {
+            delete roomObj.awaitingConfirmations;
+          }
         }
 
         io.to(roomId).emit('player_left', { players: rooms[roomId].players, roomId, roomCode: rooms[roomId].roomCode });
@@ -855,6 +867,7 @@ function startMatch(roomId: string) {
       clearInterval(interval);
       room.status = 'ended';
       io.to(roomId).emit('match_ended', {
+        roomId,
         leaderboard: Object.values(room.players).sort((a, b) => b.score - a.score)
       });
       // Cleanup room after 1 minute

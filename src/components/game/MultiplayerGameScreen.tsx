@@ -6,7 +6,10 @@ import { motion } from "framer-motion";
 import { Heart, Crosshair, ShieldPlus, SkipForward, Users, Bomb, Search } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { TutorialTour } from "@/components/game/TutorialTour";
-import { getWalletUser } from "@/lib/user";
+import { applyDuelSettlement, getWalletUser, hasDuelPayoutClaimed, hasDuelStakePaid, markDuelPayoutClaimed, markDuelStakePaid } from "@/lib/user";
+import { useGameStore } from "@/store/useGameStore";
+import { useChainId, useWriteContract } from "wagmi";
+import { parseAbi, parseEther } from "viem";
 
 type ChestItem = "gun" | "health" | "skip" | "double_kill" | "magnifier" | "empty";
 
@@ -58,6 +61,8 @@ const itemToLabel: Record<ChestItem, string> = {
 export function MultiplayerGameScreen() {
   const router = useRouter();
   const { socket, isConnected } = useSocket();
+  const chainId = useChainId();
+  const { writeContractAsync } = useWriteContract();
   const [duelState, setDuelState] = useState<DuelState | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -71,6 +76,27 @@ export function MultiplayerGameScreen() {
   const [phase, setPhase] = useState<"menu" | "stake" | "waiting" | "in_game">("menu");
   const [waitingCount, setWaitingCount] = useState(0);
   const [didCopyCode, setDidCopyCode] = useState(false);
+  const applyBtqDelta = useGameStore((state) => state.applyBtqDelta);
+  const settlementAppliedRef = useRef<string | null>(null);
+  const [stakeError, setStakeError] = useState<string | null>(null);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
+  const [isStakePending, setIsStakePending] = useState(false);
+  const [isPayoutPending, setIsPayoutPending] = useState(false);
+
+  const BTQ_ABI = useMemo(() => parseAbi([
+    "function recordGameWin(uint256 rewardAmount) external",
+    "function burn(uint256 amount) external",
+  ]), []);
+
+  const contractAddressByChain: Record<number, string | undefined> = {
+    46630: process.env.NEXT_PUBLIC_BTQ_ADDRESS_ROBINHOOD,
+    421614: process.env.NEXT_PUBLIC_BTQ_ADDRESS_ARBITRUM_SEPOLIA,
+  };
+  const contractAddress = contractAddressByChain[chainId] || process.env.NEXT_PUBLIC_BTQ_ADDRESS || "";
+  const boostedFeeOverrides = {
+    maxFeePerGas: BigInt(5_000_000_000),
+    maxPriorityFeePerGas: BigInt(1_000_000_000),
+  };
 
   const STAKE_MIN = 50;
   const STAKE_MAX = 200;
@@ -89,6 +115,65 @@ export function MultiplayerGameScreen() {
   const pendingJoinIntentRef = useRef<PendingJoinIntent | null>(null);
 
   const clampStake = (value: number) => Math.min(STAKE_MAX, Math.max(STAKE_MIN, value));
+
+  const ensureContractReady = (onFailure?: (message: string) => void) => {
+    if (!contractAddress) {
+      const message = `BTQ contract address not configured for chain ${chainId}.`;
+      if (onFailure) onFailure(message);
+      return false;
+    }
+    return true;
+  };
+
+  const lockDuelStake = async (roomKey: string, amount: number) => {
+    if (hasDuelStakePaid(roomKey)) return true;
+    if (!ensureContractReady(setStakeError)) return false;
+
+    try {
+      setStakeError(null);
+      setIsStakePending(true);
+      await writeContractAsync({
+        address: contractAddress as `0x${string}`,
+        abi: BTQ_ABI,
+        functionName: "burn",
+        args: [parseEther(amount.toString())],
+        ...boostedFeeOverrides,
+      });
+      markDuelStakePaid(roomKey);
+      return true;
+    } catch (error) {
+      const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+      setStakeError(msg);
+      return false;
+    } finally {
+      setIsStakePending(false);
+    }
+  };
+
+  const claimDuelPayout = async (roomKey: string, totalPot: number) => {
+    if (hasDuelPayoutClaimed(roomKey)) return true;
+    if (!ensureContractReady(setPayoutError)) return false;
+
+    try {
+      setPayoutError(null);
+      setIsPayoutPending(true);
+      await writeContractAsync({
+        address: contractAddress as `0x${string}`,
+        abi: BTQ_ABI,
+        functionName: "recordGameWin",
+        args: [parseEther(totalPot.toString())],
+        ...boostedFeeOverrides,
+      });
+      markDuelPayoutClaimed(roomKey);
+      return true;
+    } catch (error) {
+      const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+      setPayoutError(msg);
+      return false;
+    } finally {
+      setIsPayoutPending(false);
+    }
+  };
 
   useEffect(() => {
     pendingJoinIntentRef.current = pendingJoinIntent;
@@ -194,6 +279,30 @@ export function MultiplayerGameScreen() {
       }
     };
 
+    const onMatchEnded = (payload: { roomId?: string; winnerId?: string | null; betAmount?: number; totalPot?: number }) => {
+      const matchKey = payload.roomId || roomId || "duel";
+      if (settlementAppliedRef.current === matchKey) return;
+
+      const betAmount = payload.betAmount ?? STAKE_MIN;
+      const totalPot = payload.totalPot ?? betAmount * 2;
+      const isWinner = Boolean(socket?.id && payload.winnerId && socket.id === payload.winnerId);
+      const stakePaid = hasDuelStakePaid(matchKey);
+
+      if (stakePaid && isWinner) {
+        void claimDuelPayout(matchKey, totalPot);
+      }
+
+      if (!stakePaid) {
+        const delta = isWinner ? totalPot : -betAmount;
+        if (applyDuelSettlement(matchKey, delta)) {
+          applyBtqDelta(delta);
+        }
+      }
+
+      settlementAppliedRef.current = matchKey;
+      setStatusText(isWinner ? `You won +${totalPot} BTQ` : `You lost ${betAmount} BTQ`);
+    };
+
     socket.on("player_joined", onPlayerJoined);
     socket.on("match_started", onMatchStarted);
     socket.on("duel_state", onDuelState);
@@ -202,6 +311,7 @@ export function MultiplayerGameScreen() {
     socket.on("duel_room_created", onRoomCreated);
     socket.on("duel_join_error", onJoinError);
     socket.on("request_stake_confirmation", onRequestStakeConfirmation);
+    socket.on("match_ended", onMatchEnded);
 
     return () => {
       socket.off("player_joined", onPlayerJoined);
@@ -212,8 +322,9 @@ export function MultiplayerGameScreen() {
       socket.off("duel_room_created", onRoomCreated);
       socket.off("duel_join_error", onJoinError);
       socket.off("request_stake_confirmation", onRequestStakeConfirmation);
+      socket.off("match_ended", onMatchEnded);
     };
-  }, [socket, isConnected]);
+  }, [socket, isConnected, roomId, applyBtqDelta, chainId, contractAddress, BTQ_ABI]);
 
   useEffect(() => {
     if (!isMyTurn) {
@@ -400,9 +511,13 @@ export function MultiplayerGameScreen() {
     setStatusText("Set your stake");
   };
 
-  const confirmStakeAndJoin = () => {
+  const confirmStakeAndJoin = async () => {
     // If we're confirming a server-requested stake, tell server to proceed
     if (awaitingStakeConfirm && roomId && socket) {
+      const bet = clampStake(stakeAmount);
+      const ok = await lockDuelStake(roomId, bet);
+      if (!ok) return;
+
       setAwaitingStakeConfirm(false);
       setStakeLocked(false);
       setStatusText("Waiting for opponent...");
@@ -533,6 +648,7 @@ export function MultiplayerGameScreen() {
                 </div>
                 {!stakeLocked && <p className="text-[11px] text-white/50 mt-2">Min {STAKE_MIN} • Max {STAKE_MAX}</p>}
                 {joinError && <p className="text-xs text-red-400 mt-2">{joinError}</p>}
+                {stakeError && <p className="text-xs text-red-400 mt-2">{stakeError}</p>}
               </div>
 
               <div className="flex gap-3">
@@ -552,10 +668,10 @@ export function MultiplayerGameScreen() {
                 </button>
                 <button
                   onClick={confirmStakeAndJoin}
-                  disabled={!isConnected || isJoining}
+                  disabled={!isConnected || isJoining || isStakePending}
                   className="flex-[2] px-5 py-4 text-xs font-black uppercase tracking-widest border border-primary/40 bg-primary/10 hover:bg-primary/15 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Confirm & Continue
+                  {isStakePending ? "Locking Stake..." : "Confirm & Continue"}
                 </button>
               </div>
 
@@ -709,18 +825,31 @@ export function MultiplayerGameScreen() {
               return (
                 <div
                   key={player?.id || idx}
-                  className={`border p-3 transition-all ${
+                  className={`relative overflow-hidden border p-3 transition-all duration-300 ${
                     isTurnForPlayer
-                      ? "border-primary/70 bg-primary/10 shadow-[0_0_30px_rgba(0,242,255,0.12)]"
+                      ? "border-primary bg-primary/15 shadow-[0_0_40px_rgba(0,242,255,0.22)] ring-1 ring-primary/40 scale-[1.01]"
                       : "border-white/12 bg-black/50"
                   }`}
                 >
+                  {isTurnForPlayer && (
+                    <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent animate-pulse" />
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[9px] tracking-[0.25em] text-white/40 uppercase">{idx === 0 ? "You" : "Opponent"}</p>
-                      <p className="text-lg md:text-xl font-black uppercase tracking-tight">{player?.name || "Waiting..."}</p>
+                      <p className={`text-lg md:text-xl font-black uppercase tracking-tight ${isTurnForPlayer ? "text-primary" : "text-white"}`}>
+                        {player?.name || "Waiting..."}
+                      </p>
                     </div>
-                    <Users className="w-5 h-5 text-primary/80" />
+                    <div className="flex flex-col items-end gap-1">
+                      {isTurnForPlayer ? (
+                        <span className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.25em] bg-primary text-black">
+                          Your Turn
+                        </span>
+                      ) : (
+                        <Users className="w-5 h-5 text-primary/80" />
+                      )}
+                    </div>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     {Array.from({ length: maxLives }).map((_, i) => (
@@ -877,6 +1006,26 @@ export function MultiplayerGameScreen() {
                 </p>
                 <p className="text-[11px] text-white/55">Winner receives {duelState.totalPot} BTQ pot</p>
               </div>
+
+              {isMeWinner && (
+                <div className="mt-6 grid gap-2">
+                  {hasDuelStakePaid(roomId || "") && !hasDuelPayoutClaimed(roomId || "") && (
+                    <button
+                      onClick={() => roomId && claimDuelPayout(roomId, duelState.totalPot)}
+                      disabled={isPayoutPending}
+                      className="px-8 py-4 bg-emerald-400 text-black font-black uppercase tracking-widest disabled:opacity-50"
+                    >
+                      {isPayoutPending ? "Claiming..." : "Claim Winnings"}
+                    </button>
+                  )}
+                  {hasDuelPayoutClaimed(roomId || "") && (
+                    <p className="text-[11px] text-emerald-300 uppercase tracking-widest">Payout confirmed on-chain</p>
+                  )}
+                  {payoutError && (
+                    <p className="text-[11px] text-red-300 uppercase tracking-widest">{payoutError}</p>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={() => router.push("/lobby")}

@@ -7,6 +7,8 @@ import {
   Users, Rocket, ChevronRight, X 
 } from "lucide-react";
 import { useGameStore } from "@/store/useGameStore";
+import { useAccount } from "wagmi";
+import { getWalletUser } from "@/lib/user";
 
 const TUTORIAL_STEPS = [
   {
@@ -43,15 +45,15 @@ const TUTORIAL_STEPS = [
 
 export function TutorialOverlay() {
   const { showTutorial, setTutorial } = useGameStore();
+  const { address, isConnected } = useAccount();
   const [currentStep, setCurrentStep] = useState(0);
+  const walletId = isConnected && address ? address.toLowerCase() : getWalletUser().toLowerCase();
+  const tutorialKey = `battleq_tutorial_complete:${walletId}`;
 
   useEffect(() => {
-     // Auto-show if first time
-     const completed = localStorage.getItem("battleq_tutorial_complete");
-     if (!completed) {
-         setTutorial(true);
-     }
-  }, [setTutorial]);
+    const completed = localStorage.getItem(tutorialKey);
+    setTutorial(!completed);
+  }, [setTutorial, tutorialKey]);
 
   const handleNext = () => {
     if (currentStep < TUTORIAL_STEPS.length - 1) {
@@ -62,7 +64,7 @@ export function TutorialOverlay() {
   };
 
   const handleComplete = () => {
-    localStorage.setItem("battleq_tutorial_complete", "true");
+    localStorage.setItem(tutorialKey, "true");
     setTutorial(false);
   };
 

@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Target, X, Zap, Activity, Radio, Cpu, Swords, Loader2 } from 'lucide-react';
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/useGameStore';
 import { Tile } from './Tile';
 import { StatItem } from '@/components/ui/StatItem';
@@ -17,16 +18,35 @@ const BTQ_ABI = parseAbi([
 
 export const GameScreen = () => {
     const { solo, clickTile, setSoloStatus, startLevel, nextLevel } = useGameStore();
+    const router = useRouter();
     const chainId = useChainId();
     const { writeContractAsync } = useWriteContract();
     
     const [isPending, setIsPending] = useState(false);
+    const [penaltyError, setPenaltyError] = useState<string | null>(null);
 
     const contractAddressByChain: Record<number, string | undefined> = {
         46630: process.env.NEXT_PUBLIC_BTQ_ADDRESS_ROBINHOOD,
         421614: process.env.NEXT_PUBLIC_BTQ_ADDRESS_ARBITRUM_SEPOLIA,
     };
     const contractAddress = contractAddressByChain[chainId] || process.env.NEXT_PUBLIC_BTQ_ADDRESS || "";
+    const boostedFeeOverrides = {
+        maxFeePerGas: BigInt(5_000_000_000),
+        maxPriorityFeePerGas: BigInt(1_000_000_000),
+    };
+
+    const ensureContractReady = (onFailure?: (message: string) => void) => {
+        if (!contractAddress) {
+            const message = `BTQ contract address not configured for chain ${chainId}.`;
+            if (onFailure) {
+                onFailure(message);
+            } else {
+                alert(message);
+            }
+            return false;
+        }
+        return true;
+    };
 
     const tryStart = (lvl: number) => {
         const practiceStakes = [5, 10, 15];
@@ -44,6 +64,7 @@ export const GameScreen = () => {
 
     const handleClaimReward = async () => {
         try {
+            if (!ensureContractReady()) return;
             setIsPending(true);
             const multiplier = isElite ? (1.5 + (solo.revealedTiles.size * 0.1)) : (1.5 + (solo.level * 0.2));
             const winAmount = Math.floor(currentStake * multiplier);
@@ -53,11 +74,13 @@ export const GameScreen = () => {
                 abi: BTQ_ABI,
                 functionName: 'recordGameWin',
                 args: [parseEther(winAmount.toString())],
+                ...boostedFeeOverrides,
             });
             nextLevel();
         } catch (error) {
             console.error(error);
-            alert("Failed to claim reward.");
+            const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+            alert(`Failed to claim reward. ${msg}`);
         } finally {
             setIsPending(false);
         }
@@ -65,20 +88,33 @@ export const GameScreen = () => {
 
     const handlePayPenalty = async () => {
         try {
+            setPenaltyError(null);
+            if (!ensureContractReady(setPenaltyError)) return;
             setIsPending(true);
             await writeContractAsync({
                 address: contractAddress as `0x${string}`,
                 abi: BTQ_ABI,
                 functionName: 'burn',
                 args: [parseEther(currentStake.toString())],
+                ...boostedFeeOverrides,
             });
             tryStart(solo.level);
         } catch (error) {
             console.error(error);
-            alert("Failed to pay penalty. Transaction rejected?");
+            const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+            if (/max fee per gas less than block base fee|fee cap|underpriced/i.test(msg)) {
+                setPenaltyError("Gas was underpriced for this block. Retry payment with boosted gas, or open the lobby to refresh your wallet/network and try again.");
+            } else {
+                setPenaltyError(msg);
+            }
         } finally {
             setIsPending(false);
         }
+    };
+
+    const handleFixPenaltyIssue = () => {
+        setPenaltyError(null);
+        router.push('/lobby');
     };
 
     // Win Overlay Component
@@ -152,13 +188,20 @@ export const GameScreen = () => {
                 <h2 className="text-6xl font-black text-red-600 mb-4 tracking-tighter uppercase glitch">MISSION_FAILED</h2>
                 <p className="text-xl text-white/50 mb-10 tracking-widest font-black italic">OUT_OF_ENERGY // SCAN_ABORTED</p>
                 <p className="text-red-400 font-bold mb-4">PENALTY: -{currentStake} BTQ</p>
+                {penaltyError && (
+                    <div className="mb-6 border border-red-600/40 bg-red-950/30 p-4 text-left">
+                        <p className="text-[10px] uppercase tracking-[0.35em] text-red-300 font-black mb-2">PAYMENT_ERROR</p>
+                        <p className="text-xs text-red-100/80 leading-relaxed">{penaltyError}</p>
+                        <p className="text-[11px] text-white/50 mt-2">Open the lobby to switch network, add BTQ, or refresh your wallet balance, then retry the payment.</p>
+                    </div>
+                )}
                 
                 <div className="flex gap-4 justify-center">
                     <button
-                        onClick={() => setSoloStatus('selecting')}
-                        className="px-8 py-3 bg-white/5 border border-white/10 text-white/50 font-black uppercase text-xs"
+                        onClick={handleFixPenaltyIssue}
+                        className="px-8 py-3 bg-white/5 border border-white/10 text-white/70 font-black uppercase text-xs tracking-widest hover:bg-white/10 transition-all"
                     >
-                        ABORT_PROTOCOL
+                        FIX_IN_LOBBY
                     </button>
                     <button
                         onClick={handlePayPenalty}
@@ -166,7 +209,7 @@ export const GameScreen = () => {
                         className="px-10 py-4 bg-red-600 text-white font-black uppercase text-sm tracking-[0.3em] hover:bg-red-500 transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
                         style={{ clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0 100%)' }}
                     >
-                        {isPending ? <Loader2 className="animate-spin w-5 h-5"/> : 'PAY PENALTY & REBOOT'}
+                        {isPending ? <Loader2 className="animate-spin w-5 h-5"/> : (penaltyError ? 'RETRY PAYMENT' : 'PAY PENALTY & REBOOT')}
                     </button>
                 </div>
             </motion.div>

@@ -6,6 +6,8 @@ import { useGameStore } from "@/store/useGameStore";
 import { AuthGuard } from "@/components/shared/AuthGuard";
 import { TutorialTour } from "@/components/game/TutorialTour";
 import { MultiplayerGameScreen } from "@/components/game/MultiplayerGameScreen";
+import { useAccount } from "wagmi";
+import { getWalletUser } from "@/lib/user";
 
 // Solo System Imports
 import { LevelSelectionScreen } from "@/components/solo/LevelSelectionScreen";
@@ -18,6 +20,9 @@ export default function Arena() {
     const [mode, setMode] = useState("solo");
     const { solo, setSoloStatus, startLevel, setStake } = useGameStore();
     const [showTour, setShowTour] = useState(false);
+    const { address, isConnected } = useAccount();
+    const walletId = isConnected && address ? address.toLowerCase() : getWalletUser().toLowerCase();
+    const tourKey = `battleq_tour_v2:${walletId}`;
 
     // Sync on-chain BTQ balance → game store score
     useSyncBtqBalance();
@@ -28,11 +33,9 @@ export default function Arena() {
     }, []);
 
     useEffect(() => {
-        const hasSeenTour = localStorage.getItem('battleq_tour_v2');
-        if (!hasSeenTour) {
-            setShowTour(true);
-        }
-    }, []);
+        const hasSeenTour = localStorage.getItem(tourKey);
+        setShowTour(!hasSeenTour);
+    }, [tourKey]);
 
     if (mode === "duel") {
         return (
@@ -44,7 +47,7 @@ export default function Arena() {
 
     const completeTour = () => {
         setShowTour(false);
-        localStorage.setItem('battleq_tour_v2', 'true');
+        localStorage.setItem(tourKey, 'true');
     };
 
     // If we are in selecting OR staking mode, use the full-screen layout
@@ -88,7 +91,7 @@ export default function Arena() {
                                     level={solo.level}
                                     stakeAmount={currentStake}
                                     potentialReward={potentialReward}
-                                    onConfirm={() => setSoloStatus('playing')}
+                                    onConfirm={() => setSoloStatus('rules')}
                                     onCancel={() => setSoloStatus('selecting')}
                                     onStakeChange={isElite ? setStake : undefined}
                                 />
